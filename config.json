@@ -7,7 +7,7 @@
       "connection_method": "telnet",
       "username": "rviews",
       "password": "rviews",
-      "prompt": "route-server#",
+      "prompt": ">",
       "timeout": 20,
       "enabled": true
     },
