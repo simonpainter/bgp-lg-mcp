@@ -177,11 +177,48 @@ class SessionManager:
         """Initialize session manager."""
         self.sessions: Dict[str, BGPServerSession] = {}
         self._lock = asyncio.Lock()
+        self._warmup_in_progress = False
+        self._warmup_task: Optional[asyncio.Task] = None
         logger.info("Initialized global session manager")
 
     def _get_session_key(self, host: str, port: int, username: str) -> str:
         """Get unique key for a server session."""
         return f"{host}:{port}:{username}"
+
+    async def warmup_all_sessions(self) -> None:
+        """Pre-warm all enabled server sessions (lazy - happens once on first use)."""
+        async with self._lock:
+            # Only run warmup once
+            if self._warmup_in_progress or self.sessions:
+                return
+            self._warmup_in_progress = True
+        
+        try:
+            logger.info("Warming up connections to all enabled servers...")
+            from server import load_config  # Import here to avoid circular imports
+            
+            config_data = load_config()
+            
+            for server in config_data.get("servers", []):
+                if server.get("enabled", True):
+                    try:
+                        logger.info(f"Warming up {server['name']}...")
+                        session = await self.get_session(
+                            host=server["host"],
+                            port=server.get("port", 23),
+                            username=server.get("username", ""),
+                            password=server.get("password", ""),
+                            prompt=server.get("prompt", "#"),
+                            timeout=server.get("timeout", 20),
+                        )
+                        logger.info(f"✓ {server['name']} ready (queries will be <1s)")
+                    except Exception as e:
+                        logger.warning(f"⚠ Failed to warm {server['name']}: {e}")
+            
+            logger.info("✓ Connection warmup complete")
+        finally:
+            async with self._lock:
+                self._warmup_in_progress = False
 
     async def get_session(
         self,
