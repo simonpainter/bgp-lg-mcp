@@ -1,0 +1,18 @@
+[project]
+name = "bgp-lg-mcp"
+version = "0.1.0"
+description = "BGP Looking Glass MCP Server"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp>=1.0.0",
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.23.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+bgp-lg-mcp = "server:run_http_server"

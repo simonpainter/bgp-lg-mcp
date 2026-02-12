@@ -1,0 +1,14 @@
+{
+  "servers": [
+    {
+      "name": "route-server.ip.att.net",
+      "host": "route-server.ip.att.net",
+      "port": 23,
+      "connection_method": "telnet",
+      "username": "rviews",
+      "password": "rviews",
+      "prompt": "route-server#",
+      "enabled": true
+    }
+  ]
+}
