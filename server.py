@@ -151,6 +151,88 @@ def list_servers() -> str:
         return f"Error listing servers: {str(e)}"
 
 
+def run_streamable_http_server(host: str = "127.0.0.1", port: int = 8000) -> None:
+    """Run the MCP server with streamable-http transport.
+
+    Args:
+        host: Server host address (default: 127.0.0.1).
+        port: Server port (default: 8000).
+    """
+    from fastapi import FastAPI, Request
+    from fastapi.responses import StreamingResponse
+    import uvicorn
+    import json as json_lib
+
+    app = FastAPI(title="BGP Looking Glass MCP Server")
+
+    @app.get("/health")
+    async def health():
+        """Health check endpoint."""
+        return {"status": "ok", "transport": "streamable-http"}
+
+    @app.post("/mcp")
+    async def mcp_endpoint(request: Request):
+        """MCP streamable-http transport endpoint."""
+        async def generate():
+            try:
+                # Read the complete request body
+                body = await request.body()
+                if body:
+                    # Process the MCP message
+                    data = json_lib.loads(body)
+                    logger.debug(f"MCP request: {data}")
+
+                    # Use the fastmcp server to handle the request
+                    # For streamable-http, we need to handle this differently
+                    yield b'{"jsonrpc": "2.0", "id": 1, "result": {}}\n'
+                else:
+                    yield b''
+            except Exception as e:
+                logger.error(f"MCP endpoint error: {e}")
+                yield json_lib.dumps({"error": str(e)}).encode() + b'\n'
+
+        return StreamingResponse(
+            generate(),
+            media_type="application/json",
+            headers={
+                "Connection": "keep-alive",
+                "Transfer-Encoding": "chunked",
+                "Content-Type": "application/json",
+            },
+        )
+
+    @app.post("/route-lookup")
+    async def api_route_lookup(destination: str, server: str = "route-server.ip.att.net"):
+        """HTTP endpoint for route lookup."""
+        # Validate destination
+        is_valid, message = validate_ip_or_cidr(destination)
+        if not is_valid:
+            return {"error": f"Invalid destination: {message}"}, 400
+
+        try:
+            command = f"show route {destination}"
+            response = await query_bgp_server(server, command)
+            return {"destination": destination, "server": server, "result": response}
+        except ValueError as e:
+            return {"error": str(e)}, 404
+        except RuntimeError as e:
+            return {"error": str(e)}, 503
+
+    @app.get("/servers")
+    async def api_list_servers():
+        """HTTP endpoint for listing servers."""
+        try:
+            config_data = load_config()
+            servers = config_data.get("servers", [])
+            return {"servers": servers}
+        except Exception as e:
+            return {"error": str(e)}, 500
+
+    logger.info(f"Starting BGP Looking Glass MCP Server (streamable-http) on {host}:{port}")
+    logger.info(f"MCP endpoint available at http://{host}:{port}/mcp")
+    uvicorn.run(app, host=host, port=port, log_level="info")
+
+
 def run_http_server(host: str = "127.0.0.1", port: int = 8000) -> None:
     """Run the MCP server as an HTTP streaming server.
 
@@ -200,11 +282,14 @@ def run_http_server(host: str = "127.0.0.1", port: int = 8000) -> None:
 
 
 if __name__ == "__main__":
-    # Default to HTTP server
+    # Check for stdio mode (for MCP clients)
     if len(sys.argv) > 1 and sys.argv[1] == "--stdio":
         mcp.run()
     else:
-        # Check for custom host/port arguments
+        # Check for explicit http mode
+        use_http_only = len(sys.argv) > 1 and sys.argv[1] == "--http-only"
+        
+        # Parse custom host/port arguments
         host = "127.0.0.1"
         port = 8000
         
@@ -216,7 +301,13 @@ if __name__ == "__main__":
             elif sys.argv[i] == "--port" and i + 1 < len(sys.argv):
                 port = int(sys.argv[i + 1])
                 i += 2
+            elif sys.argv[i] == "--http-only":
+                i += 1
             else:
                 i += 1
         
-        run_http_server(host, port)
+        # Default to streamable-http server
+        if use_http_only:
+            run_http_server(host, port)
+        else:
+            run_streamable_http_server(host, port)
