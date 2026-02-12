@@ -1,9 +1,8 @@
 """Telnet client for BGP looking-glass servers."""
 
 import asyncio
-import telnetlib
-from typing import Optional
 import logging
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
