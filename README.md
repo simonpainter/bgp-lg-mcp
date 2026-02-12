@@ -59,22 +59,28 @@ Configure your BGP looking-glass servers in `config.json`:
 
 ## Usage
 
-### Running the HTTP Server (Default)
+### Running the Streamable-HTTP Server (Default)
+
+The server defaults to MCP streamable-http transport mode, which is ideal for web-based clients:
 
 ```bash
 python server.py
 ```
 
-The server will start on `http://127.0.0.1:8000` by default.
+The server will start on `http://127.0.0.1:8000` by default with the `/mcp` endpoint for MCP protocol.
 
 **Custom host and port:**
 ```bash
 python server.py --host 0.0.0.0 --port 8080
 ```
 
-**Interactive API documentation:**
-- Swagger UI: `http://127.0.0.1:8000/docs`
-- ReDoc: `http://127.0.0.1:8000/redoc`
+### Running in Plain HTTP Mode
+
+For REST API access without MCP protocol:
+
+```bash
+python server.py --http-only
+```
 
 ### Running in MCP Stdio Mode
 
@@ -87,12 +93,15 @@ python server.py --stdio
 ### After Installation
 
 ```bash
-bgp-lg-mcp                    # Run HTTP server
-bgp-lg-mcp --stdio            # Run in MCP mode
+bgp-lg-mcp                    # Run streamable-http server (default)
+bgp-lg-mcp --http-only        # Run plain HTTP API server
+bgp-lg-mcp --stdio            # Run in MCP stdio mode
 bgp-lg-mcp --host 0.0.0.0 --port 3000  # Custom host/port
 ```
 
 ## HTTP API Endpoints
+
+The server supports both MCP streamable-http transport and plain HTTP REST API endpoints.
 
 ### Health Check
 ```
@@ -101,12 +110,19 @@ GET /health
 
 Returns server status.
 
-### Route Lookup
+### MCP Streamable-HTTP Endpoint
+```
+POST /mcp
+```
+
+MCP protocol endpoint for streamable-http transport clients. This is the default transport for web-based MCP clients.
+
+### Route Lookup (REST API)
 ```
 POST /route-lookup?destination=1.1.1.1&server=route-server.ip.att.net
 ```
 
-Query a route on a BGP looking-glass server.
+Query a route on a BGP looking-glass server (plain HTTP mode only).
 
 **Query Parameters:**
 - `destination` (required): IPv4/IPv6 address or CIDR subnet
@@ -121,12 +137,12 @@ Query a route on a BGP looking-glass server.
 }
 ```
 
-### List Servers
+### List Servers (REST API)
 ```
 GET /servers
 ```
 
-Get configuration for all available servers.
+Get configuration for all available servers (plain HTTP mode only).
 
 **Response:**
 ```json
