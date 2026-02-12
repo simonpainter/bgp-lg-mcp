@@ -11,6 +11,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.stdio import stdio_server
 
 from bgp_client import BGPTelnetClient
+from session_manager import get_session_manager, close_session_manager
 from validation import validate_ip_or_cidr, get_ip_type
 
 # Setup logging
@@ -62,7 +63,7 @@ def get_server_config(server_name: str) -> Optional[dict]:
 
 
 async def query_bgp_server(server_name: str, command: str) -> str:
-    """Query a BGP looking-glass server.
+    """Query a BGP looking-glass server using persistent session.
 
     Args:
         server_name: Name of the server to query.
@@ -78,17 +79,23 @@ async def query_bgp_server(server_name: str, command: str) -> str:
     if not server_config.get("enabled", True):
         raise ValueError(f"Server '{server_name}' is disabled")
 
+    manager = get_session_manager()
+    
     try:
-        async with BGPTelnetClient(
+        # Get or create a persistent session
+        session = await manager.get_session(
             host=server_config["host"],
             port=server_config.get("port", 23),
             username=server_config.get("username", ""),
             password=server_config.get("password", ""),
             prompt=server_config.get("prompt", "#"),
-            timeout=server_config.get("timeout", 10),
-        ) as client:
-            response = await client.send_command(command)
-            return response
+            timeout=server_config.get("timeout", 20),
+        )
+        
+        # Send command using the persistent connection
+        response = await session.send_command(command)
+        return response
+        
     except Exception as e:
         raise RuntimeError(f"Failed to query {server_name}: {str(e)}")
 
@@ -170,11 +177,42 @@ def run_streamable_http_server(host: str = "127.0.0.1", port: int = 8000) -> Non
     """
     import uvicorn
 
+    # Pre-warm connections to configured servers
+    async def warmup_connections():
+        """Eagerly connect to all enabled servers at startup."""
+        logger.info("Pre-warming connections to enabled servers...")
+        manager = get_session_manager()
+        config_data = load_config()
+        
+        for server in config_data.get("servers", []):
+            if server.get("enabled", True):
+                try:
+                    logger.info(f"Warming up connection to {server['name']}...")
+                    session = await manager.get_session(
+                        host=server["host"],
+                        port=server.get("port", 23),
+                        username=server.get("username", ""),
+                        password=server.get("password", ""),
+                        prompt=server.get("prompt", "#"),
+                        timeout=server.get("timeout", 20),
+                    )
+                    logger.info(f"✓ {server['name']} connection ready")
+                except Exception as e:
+                    logger.warning(f"⚠ Failed to pre-warm {server['name']}: {e}")
+
     # Use FastMCP's built-in streamable-http app
     app = mcp.streamable_http_app
-
+    
     logger.info(f"Starting BGP Looking Glass MCP Server (streamable-http) on {host}:{port}")
     logger.info(f"MCP endpoint available at http://{host}:{port}/mcp")
+    
+    # Start warmup in background after server starts
+    def on_startup():
+        asyncio.create_task(warmup_connections())
+    
+    # We can't easily hook into uvicorn startup, so we'll let the first request trigger it
+    # But we'll add a health check endpoint that triggers warmup
+    
     uvicorn.run(app, host=host, port=port, log_level="info")
 
 
@@ -229,7 +267,11 @@ def run_http_server(host: str = "127.0.0.1", port: int = 8000) -> None:
 if __name__ == "__main__":
     # Check for stdio mode (for MCP clients)
     if len(sys.argv) > 1 and sys.argv[1] == "--stdio":
-        mcp.run()
+        try:
+            mcp.run()
+        finally:
+            # Clean up sessions on shutdown
+            asyncio.run(close_session_manager())
     else:
         # Check for explicit http mode
         use_http_only = len(sys.argv) > 1 and sys.argv[1] == "--http-only"
@@ -251,8 +293,12 @@ if __name__ == "__main__":
             else:
                 i += 1
         
-        # Default to streamable-http server
-        if use_http_only:
-            run_http_server(host, port)
-        else:
-            run_streamable_http_server(host, port)
+        try:
+            # Default to streamable-http server
+            if use_http_only:
+                run_http_server(host, port)
+            else:
+                run_streamable_http_server(host, port)
+        finally:
+            # Clean up sessions on shutdown
+            asyncio.run(close_session_manager())

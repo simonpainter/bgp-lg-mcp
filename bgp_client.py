@@ -134,7 +134,7 @@ class BGPTelnetClient:
 
             # Read initial banner/prompt
             logger.debug("Reading initial banner/prompt...")
-            banner = await self._read_until_prompt(max_wait=self.timeout)
+            banner = await self._read_until_prompt(max_wait=15, require_prompt=False)
             logger.info(f"✓ Received banner ({len(banner)} bytes)")
             logger.debug(f"Banner content:\n{banner}")
 
@@ -188,15 +188,21 @@ class BGPTelnetClient:
         await self.writer.drain()
         logger.debug("✓ Command sent and drained")
 
-    async def _read_until_prompt(self, max_wait: int = 5) -> str:
-        """Read from server until prompt is found or timeout."""
+    async def _read_until_prompt(self, max_wait: int = 5, require_prompt: bool = True) -> str:
+        """Read from server until prompt is found or timeout.
+        
+        Args:
+            max_wait: Maximum time to wait in seconds.
+            require_prompt: If False, return after getting some data (for banners).
+        """
         if not self.reader:
             raise ConnectionError("Not connected")
 
         output = b""
         bytes_read = 0
         start_time = asyncio.get_event_loop().time()
-        read_timeout = min(2, max_wait)  # Use shorter read timeout for more responsiveness
+        read_timeout = 1.0  # Shorter read timeout for faster responsiveness
+        had_data = False  # Track if we've ever received data
         
         try:
             while True:
@@ -213,6 +219,7 @@ class BGPTelnetClient:
 
                     bytes_read += len(chunk)
                     elapsed = asyncio.get_event_loop().time() - start_time
+                    had_data = True
                     
                     # Handle telnet negotiation
                     cleaned, telnet_response = self._handle_telnet_negotiation(chunk)
@@ -224,7 +231,7 @@ class BGPTelnetClient:
                     
                     if cleaned:
                         output += cleaned
-                        logger.debug(f"Received content: {len(cleaned)} bytes (total: {bytes_read}, elapsed: {elapsed:.2f}s)")
+                        logger.debug(f"Received: {len(cleaned)} bytes (total: {bytes_read}, elapsed: {elapsed:.2f}s)")
 
                     # Check for pager output and handle it
                     decoded_partial = output.decode(errors="replace")
@@ -239,31 +246,50 @@ class BGPTelnetClient:
 
                     # Check if prompt is in output
                     if self.prompt.encode() in output:
-                        logger.debug(f"✓ Found prompt '{self.prompt}' in output")
+                        logger.debug(f"✓ Found prompt '{self.prompt}'")
                         break
-                    elif cleaned:
-                        logger.debug(f"Waiting for prompt '{self.prompt}' (have {len(output)} bytes)...")
+                    elif cleaned and not require_prompt:
+                        # For banner-like responses, return after getting some data
+                        logger.debug(f"✓ Got data ({len(output)} bytes), returning (prompt not required)")
+                        break
                         
                 except asyncio.TimeoutError:
                     elapsed = asyncio.get_event_loop().time() - start_time
-                    if elapsed > max_wait:
-                        logger.debug(f"Overall timeout after {elapsed:.2f}s, {bytes_read} bytes received")
-                        if output:
-                            logger.warning(f"⚠ Timeout waiting for prompt after receiving {bytes_read} bytes")
-                            break
-                        raise
-                    else:
-                        # Continue waiting if we haven't hit max_wait yet
-                        logger.debug(f"Read timeout at {elapsed:.2f}s, continuing...")
+                    
+                    # If we haven't received any data yet, keep waiting
+                    if not had_data:
+                        if elapsed > max_wait:
+                            raise ConnectionError(f"No response from server within {max_wait}s")
+                        logger.debug(f"No data yet at {elapsed:.2f}s, continuing...")
                         continue
+                    
+                    # If we have data but no prompt, and we don't require prompt, return it
+                    if output and not require_prompt:
+                        logger.debug(f"✓ Returning after {elapsed:.2f}s with {bytes_read} bytes (prompt not required)")
+                        break
+                    
+                    # If we have data but still waiting for prompt
+                    if output:
+                        if elapsed > max_wait:
+                            logger.warning(f"⚠ Timeout after {elapsed:.2f}s with {bytes_read} bytes, returning what we have")
+                            break
+                        # Continue waiting for more data/prompt
+                        logger.debug(f"Waiting for prompt at {elapsed:.2f}s ({bytes_read} bytes)...")
+                        continue
+                    
+                    # No data and no prompt yet
+                    if elapsed > max_wait:
+                        raise ConnectionError(f"No response from server within {max_wait}s")
+                    logger.debug(f"Still waiting at {elapsed:.2f}s...")
+                    continue
                         
         except asyncio.TimeoutError:
-            logger.error(f"✗ Timeout waiting for prompt after {max_wait}s with {bytes_read} bytes")
+            logger.error(f"✗ Timeout after {max_wait}s with {bytes_read} bytes")
             if not output:
                 raise ConnectionError(f"No response from server within {max_wait}s")
 
         decoded = output.decode(errors="replace").strip()
-        logger.info(f"✓ Read complete: {bytes_read} bytes, {len(decoded)} characters")
+        logger.info(f"✓ Read: {bytes_read} bytes, {len(decoded)} chars")
         return decoded
 
     async def send_command(self, command: str) -> str:
