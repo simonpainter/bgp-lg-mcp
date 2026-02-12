@@ -81,6 +81,53 @@ class SessionManager:
         
         return client
 
+    async def get_bgp_summary(
+        self,
+        host: str,
+        port: int = 23,
+        username: str = "",
+        password: str = "",
+        prompt: str = "#",
+        timeout: int = 15,
+    ) -> str:
+        """Get BGP summary information from a server.
+        
+        Args:
+            host: Hostname or IP address.
+            port: Telnet port (default 23).
+            username: Login username (empty = anonymous).
+            password: Login password.
+            prompt: Command prompt indicator.
+            timeout: Connection timeout in seconds.
+            
+        Returns:
+            BGP summary output from the server.
+        """
+        # Create new client for this request
+        client = BGPTelnetClient(
+            host=host,
+            port=port,
+            username=username,
+            password=password,
+            prompt=prompt,
+            timeout=timeout,
+        )
+        
+        try:
+            # Connect and authenticate
+            await client.connect()
+            
+            # Send BGP summary command
+            response = await client.send_command("show ip bgp summary")
+            
+            return response
+        finally:
+            # Always close the connection
+            try:
+                await client.close()
+            except Exception:
+                pass
+
     async def close(self) -> None:
         """Close all active clients."""
         for client in self.clients.values():

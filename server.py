@@ -145,6 +145,67 @@ async def route_lookup(destination: str, server: str = "RouteViews Linx") -> str
 
 
 @mcp.tool()
+async def bgp_summary(server: str = "RouteViews Linx") -> str:
+    """Get BGP summary information from a route server.
+
+    Returns information about the BGP router including neighbor counts, 
+    AS number, router ID, and other BGP statistics.
+
+    Args:
+        server: Name of the BGP server to query (default: RouteViews Linx - fastest).
+
+    Returns:
+        BGP summary output from the server showing router statistics and neighbors.
+    """
+    server_config = get_server_config(server)
+    if not server_config:
+        error_msg = f"Server '{server}' not found in configuration"
+        logger.error(error_msg)
+        return error_msg
+
+    if not server_config.get("enabled", True):
+        error_msg = f"Server '{server}' is disabled"
+        logger.error(error_msg)
+        return error_msg
+
+    try:
+        # Create on-demand connection
+        client = BGPTelnetClient(
+            host=server_config["host"],
+            port=server_config.get("port", 23),
+            username=server_config.get("username", ""),
+            password=server_config.get("password", ""),
+            prompt=server_config.get("prompt", "#"),
+            timeout=server_config.get("timeout", 15),
+        )
+        
+        # Connect
+        await client.connect()
+        
+        # Send BGP summary command
+        response = await client.send_command("show ip bgp summary")
+        
+        # Close connection
+        await client.close()
+        
+        logger.info(f"Retrieved BGP summary from {server}")
+        return response
+        
+    except ConnectionError as e:
+        error_msg = f"Connection error to {server}: {str(e)} - The BGP server may be unreachable or not accepting connections"
+        logger.error(error_msg)
+        return error_msg
+    except RuntimeError as e:
+        error_msg = f"Query error from {server}: {str(e)}"
+        logger.error(error_msg)
+        return error_msg
+    except Exception as e:
+        error_msg = f"Unexpected error querying {server}: {type(e).__name__}: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        return error_msg
+
+
+@mcp.tool()
 def list_servers() -> str:
     """List all configured BGP looking-glass servers.
 
