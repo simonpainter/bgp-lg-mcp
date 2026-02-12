@@ -276,27 +276,21 @@ Returns all configured servers and their details.
 
 ## Claude Desktop Integration
 
-Claude Desktop requires HTTPS connections to MCP servers. Follow these steps:
+### ⚡ Quickest Setup (Recommended)
 
-### Step 1: Generate SSL Certificate
-
-```bash
-./generate_cert.sh
-```
-
-This creates `cert.pem` and `key.pem` for local development.
-
-### Step 2: Run Server with HTTPS
+Use **stdio mode** - no HTTPS needed, no server to run:
 
 ```bash
-python server.py --ssl-cert cert.pem --ssl-key key.pem
+./start-server.sh
 ```
 
-The server will run on `https://127.0.0.1:8000/mcp`
+Or manually:
 
-### Step 3: Configure Claude Desktop
+```bash
+python server.py --stdio
+```
 
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, or the equivalent config file on Windows/Linux:
+Then add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
 
 ```json
 {
@@ -309,26 +303,58 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` on macO
 }
 ```
 
-**OR** for streamable-http transport (requires HTTPS):
+Restart Claude Desktop and the tools will appear in your MCP tools list.
 
-```json
-{
-  "mcpServers": {
-    "bgp-lg": {
-      "url": "https://localhost:8000/mcp",
-      "transport": "sse"
-    }
-  }
-}
-```
+---
 
-For the streamable-http approach, make sure the server is running before starting Claude Desktop.
+### Advanced: Streamable-HTTP with HTTPS
 
-### Step 4: Restart Claude Desktop
+If you need to run a separate server (streamable-http transport), HTTPS is required. However, **Claude Desktop has strict SSL certificate validation** and won't accept self-signed certificates for remote connections.
 
-After updating the config, restart Claude Desktop. The BGP Looking Glass tools will appear in the MCP tools list.
+**Options:**
 
-**Note:** Claude Desktop may warn about the self-signed certificate. This is normal for development - you can safely ignore the warning and proceed.
+1. **Use a proper CA-signed certificate** (production):
+   ```bash
+   python server.py --ssl-cert /path/to/ca-signed-cert.pem --ssl-key /path/to/ca-key.pem
+   ```
+   Then add to Claude Desktop config:
+   ```json
+   {
+     "mcpServers": {
+       "bgp-lg": {
+         "url": "https://your-domain.com:8000/mcp",
+         "transport": "sse"
+       }
+     }
+   }
+   ```
+
+2. **Use mkcert for trusted self-signed certificates** (development):
+   ```bash
+   # Install mkcert: https://github.com/FiloSottile/mkcert
+   mkcert localhost 127.0.0.1
+   python server.py --ssl-cert localhost.pem --ssl-key localhost-key.pem
+   ```
+   Then add to Claude Desktop config:
+   ```json
+   {
+     "mcpServers": {
+       "bgp-lg": {
+         "url": "https://localhost:8000/mcp",
+         "transport": "sse"
+       }
+     }
+   }
+   ```
+
+3. **Stick with stdio mode** (simplest and recommended):
+   No HTTPS, no certificate issues, instant setup.
+
+---
+
+### Restart Claude Desktop
+
+After updating the config, restart Claude Desktop. The BGP Looking Glass tools will appear in your MCP tools list.
 
 ## Supported Servers
 
@@ -383,6 +409,46 @@ Install with development dependencies:
 ```bash
 pip install -e ".[dev]"
 ```
+
+## Troubleshooting
+
+### "Connection Error - Check if your MCP server is running and proxy token is correct"
+
+**Solution:** Use **stdio mode** instead of streamable-http:
+```bash
+python server.py --stdio
+```
+
+The error typically occurs with streamable-http because Claude Desktop strictly validates SSL certificates and won't accept self-signed certificates.
+
+### HTTPS doesn't work with Claude Desktop
+
+**Reason:** Claude Desktop requires certificates signed by a trusted Certificate Authority for remote/streamable-http connections.
+
+**Solutions:**
+1. Use stdio mode (no HTTPS needed) - **recommended**
+2. Use mkcert to create trusted development certificates
+3. Use a proper CA-signed certificate for production
+
+See the "Claude Desktop Integration" section above for detailed setup.
+
+### Server won't start
+
+**Check:**
+- Python 3.7+ is installed
+- All dependencies are installed: `pip install -e .`
+- Port 8000 isn't in use: `lsof -i :8000` (macOS/Linux)
+- Certificate files exist if using HTTPS: `ls -la *.pem`
+
+### Route lookup returns empty results
+
+**Check:**
+- The destination IP is public (not 10.x.x.x, 192.168.x.x, etc.)
+- The server is reachable: `telnet route-views.linx.routeviews.org 23`
+- Try a different server in case one is down
+- Check server logs for error details
+
+## Development
 
 ## Common BGP Queries
 
