@@ -60,6 +60,35 @@ def get_server_config(server_name: str) -> Optional[dict]:
     return None
 
 
+def get_available_servers() -> list:
+    """Get list of available (enabled) server names from config.
+
+    Returns:
+        List of enabled server names.
+    """
+    config_data = load_config()
+    return [
+        server.get("name")
+        for server in config_data.get("servers", [])
+        if server.get("enabled", True)
+    ]
+
+
+def build_server_description() -> str:
+    """Build a formatted description of available servers for tool docs.
+
+    Returns:
+        Formatted string describing available servers.
+    """
+    servers = get_available_servers()
+    if not servers:
+        return "No servers available."
+    
+    desc = "Available servers: " + ", ".join(servers)
+    desc += f". Default: '{servers[0]}' (fastest)."
+    return desc
+
+
 async def query_bgp_server(server_name: str, destination: str) -> str:
     """Query a BGP looking-glass server for route information.
 
@@ -110,7 +139,9 @@ async def route_lookup(destination: str, server: str = "RouteViews Linx") -> str
 
     Args:
         destination: IPv4/IPv6 address or CIDR subnet (e.g., 1.1.1.1 or 1.1.1.0/24).
-        server: Name of the BGP server to query (default: RouteViews Linx - fastest).
+        server: Name of the BGP server to query. RouteViews Linx (default) is fastest at ~50ms.
+                Other options: RouteViews Equinix, RouteViews ISC, RouteViews Main, 
+                RouteViews WIDE, RouteViews Chicago, RouteViews Sydney.
 
     Returns:
         Route lookup results from the BGP server.
@@ -152,7 +183,9 @@ async def bgp_summary(server: str = "RouteViews Linx") -> str:
     AS number, router ID, and other BGP statistics.
 
     Args:
-        server: Name of the BGP server to query (default: RouteViews Linx - fastest).
+        server: Name of the BGP server to query. RouteViews Linx (default) is fastest at ~50ms.
+                Other options: RouteViews Equinix, RouteViews ISC, RouteViews Main,
+                RouteViews WIDE, RouteViews Chicago, RouteViews Sydney.
 
     Returns:
         BGP summary output from the server showing router statistics and neighbors.
@@ -161,6 +194,47 @@ async def bgp_summary(server: str = "RouteViews Linx") -> str:
     if not server_config:
         error_msg = f"Server '{server}' not found in configuration"
         logger.error(error_msg)
+        return error_msg
+
+    if not server_config.get("enabled", True):
+        error_msg = f"Server '{server}' is disabled"
+        logger.error(error_msg)
+        return error_msg
+
+    try:
+        # Create on-demand connection
+        client = BGPTelnetClient(
+            host=server_config["host"],
+            port=server_config.get("port", 23),
+            username=server_config.get("username", ""),
+            password=server_config.get("password", ""),
+            prompt=server_config.get("prompt", "#"),
+            timeout=server_config.get("timeout", 15),
+        )
+        
+        # Connect
+        await client.connect()
+        
+        # Send BGP summary command
+        response = await client.send_command("show ip bgp summary")
+        
+        # Close connection
+        await client.close()
+        
+        logger.info(f"Retrieved BGP summary from {server}")
+        return response
+        
+    except ConnectionError as e:
+        error_msg = f"Connection error to {server}: {str(e)} - The BGP server may be unreachable or not accepting connections"
+        logger.error(error_msg)
+        return error_msg
+    except RuntimeError as e:
+        error_msg = f"Query error from {server}: {str(e)}"
+        logger.error(error_msg)
+        return error_msg
+    except Exception as e:
+        error_msg = f"Unexpected error querying {server}: {type(e).__name__}: {str(e)}"
+        logger.error(error_msg, exc_info=True)
         return error_msg
 
     if not server_config.get("enabled", True):
