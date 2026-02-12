@@ -196,14 +196,15 @@ class BGPTelnetClient:
         output = b""
         bytes_read = 0
         start_time = asyncio.get_event_loop().time()
+        read_timeout = min(2, max_wait)  # Use shorter read timeout for more responsiveness
         
         try:
             while True:
                 try:
-                    # Use a shorter read timeout but with overall max_wait
+                    # Use shorter individual read timeout
                     chunk = await asyncio.wait_for(
                         self.reader.read(4096),
-                        timeout=5,  # 5 second read timeout
+                        timeout=read_timeout,
                     )
                     
                     if not chunk:
@@ -216,7 +217,7 @@ class BGPTelnetClient:
                     # Handle telnet negotiation
                     cleaned, telnet_response = self._handle_telnet_negotiation(chunk)
                     
-                    if telnet_response:
+                    if telnet_response and self.writer:
                         logger.debug(f"Sending telnet response: {telnet_response.hex()}")
                         self.writer.write(telnet_response)
                         await self.writer.drain()
@@ -224,14 +225,24 @@ class BGPTelnetClient:
                     if cleaned:
                         output += cleaned
                         logger.debug(f"Received content: {len(cleaned)} bytes (total: {bytes_read}, elapsed: {elapsed:.2f}s)")
-                        logger.debug(f"Decoded: {cleaned.decode(errors='replace')}")
+
+                    # Check for pager output and handle it
+                    decoded_partial = output.decode(errors="replace")
+                    if "---(more)---" in decoded_partial or "---(" in decoded_partial:
+                        logger.debug("✓ Found pager marker, sending 'q' to quit paging")
+                        if self.writer:
+                            self.writer.write(b"q")
+                            await self.writer.drain()
+                        # Clear the more marker from output
+                        output = output.replace(b"---(more)---", b"")
+                        continue
 
                     # Check if prompt is in output
                     if self.prompt.encode() in output:
                         logger.debug(f"✓ Found prompt '{self.prompt}' in output")
                         break
-                    elif output:
-                        logger.debug(f"Waiting for prompt '{self.prompt}'...")
+                    elif cleaned:
+                        logger.debug(f"Waiting for prompt '{self.prompt}' (have {len(output)} bytes)...")
                         
                 except asyncio.TimeoutError:
                     elapsed = asyncio.get_event_loop().time() - start_time
