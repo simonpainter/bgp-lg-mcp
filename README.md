@@ -1,15 +1,35 @@
 # bgp-lg-mcp
 
-A BGP Looking Glass MCP (Model Context Protocol) server that allows you to query BGP routes from various looking-glass servers.
+A BGP Looking Glass MCP (Model Context Protocol) server that allows you to query BGP routes from various looking-glass servers via persistent, authenticated connections.
 
 ## Features
 
+- **Fast BGP route queries** via persistent connections (~0.4s per query)
 - Query BGP routes from multiple looking-glass servers
 - Support for IPv4 and IPv6 addresses
 - CIDR subnet notation support
 - Validation of public IP addresses (blocks private/reserved ranges)
-- Telnet-based connection to BGP servers
+- **Persistent authenticated telnet connections** - no re-authentication needed
+- **Auto-reconnection** if connection drops
 - Configurable server list with credentials
+- **Pre-warmed connections** on server startup for instant MCP requests
+
+## Performance
+
+- **Server startup**: ~22 seconds (pre-warms all configured connections)
+- **First BGP query**: <1 second (uses pre-warmed connection)
+- **Subsequent queries**: <0.5 seconds (reuses persistent connection)
+
+Without persistent connections, each query would take 29+ seconds (login overhead).
+
+## How It Works
+
+The server uses a **persistent session manager** that:
+1. Maintains authenticated connections to each configured BGP server
+2. Pre-warms all connections when the server starts
+3. Reuses connections for all queries - no login required per query
+4. Auto-reconnects if a connection becomes stale
+5. Allows instant <1s BGP lookups after startup
 
 ## Installation
 
