@@ -12,6 +12,17 @@
       "enabled": true
     },
     {
+      "name": "route-views.routeviews.org",
+      "host": "route-views.routeviews.org",
+      "port": 23,
+      "connection_method": "telnet",
+      "username": "rviews",
+      "password": "rviews",
+      "prompt": "route-views@route-views>",
+      "timeout": 20,
+      "enabled": false
+    },
+    {
       "name": "demo",
       "host": "demo.bgp-lg.local",
       "port": 23,
