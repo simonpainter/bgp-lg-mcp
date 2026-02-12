@@ -8,7 +8,19 @@
       "username": "rviews",
       "password": "rviews",
       "prompt": "route-server#",
+      "timeout": 20,
       "enabled": true
+    },
+    {
+      "name": "demo",
+      "host": "demo.bgp-lg.local",
+      "port": 23,
+      "connection_method": "telnet",
+      "username": "demo",
+      "password": "demo",
+      "prompt": "demo#",
+      "timeout": 10,
+      "enabled": false
     }
   ]
 }
