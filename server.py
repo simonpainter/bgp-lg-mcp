@@ -158,75 +158,10 @@ def run_streamable_http_server(host: str = "127.0.0.1", port: int = 8000) -> Non
         host: Server host address (default: 127.0.0.1).
         port: Server port (default: 8000).
     """
-    from fastapi import FastAPI, Request
-    from fastapi.responses import StreamingResponse
     import uvicorn
-    import json as json_lib
 
-    app = FastAPI(title="BGP Looking Glass MCP Server")
-
-    @app.get("/health")
-    async def health():
-        """Health check endpoint."""
-        return {"status": "ok", "transport": "streamable-http"}
-
-    @app.post("/mcp")
-    async def mcp_endpoint(request: Request):
-        """MCP streamable-http transport endpoint."""
-        async def generate():
-            try:
-                # Read the complete request body
-                body = await request.body()
-                if body:
-                    # Process the MCP message
-                    data = json_lib.loads(body)
-                    logger.debug(f"MCP request: {data}")
-
-                    # Use the fastmcp server to handle the request
-                    # For streamable-http, we need to handle this differently
-                    yield b'{"jsonrpc": "2.0", "id": 1, "result": {}}\n'
-                else:
-                    yield b''
-            except Exception as e:
-                logger.error(f"MCP endpoint error: {e}")
-                yield json_lib.dumps({"error": str(e)}).encode() + b'\n'
-
-        return StreamingResponse(
-            generate(),
-            media_type="application/json",
-            headers={
-                "Connection": "keep-alive",
-                "Transfer-Encoding": "chunked",
-                "Content-Type": "application/json",
-            },
-        )
-
-    @app.post("/route-lookup")
-    async def api_route_lookup(destination: str, server: str = "route-server.ip.att.net"):
-        """HTTP endpoint for route lookup."""
-        # Validate destination
-        is_valid, message = validate_ip_or_cidr(destination)
-        if not is_valid:
-            return {"error": f"Invalid destination: {message}"}, 400
-
-        try:
-            command = f"show route {destination}"
-            response = await query_bgp_server(server, command)
-            return {"destination": destination, "server": server, "result": response}
-        except ValueError as e:
-            return {"error": str(e)}, 404
-        except RuntimeError as e:
-            return {"error": str(e)}, 503
-
-    @app.get("/servers")
-    async def api_list_servers():
-        """HTTP endpoint for listing servers."""
-        try:
-            config_data = load_config()
-            servers = config_data.get("servers", [])
-            return {"servers": servers}
-        except Exception as e:
-            return {"error": str(e)}, 500
+    # Use FastMCP's built-in streamable-http app
+    app = mcp.streamable_http_app
 
     logger.info(f"Starting BGP Looking Glass MCP Server (streamable-http) on {host}:{port}")
     logger.info(f"MCP endpoint available at http://{host}:{port}/mcp")
