@@ -71,3 +71,7 @@ venv.bak/
 
 # Project specific
 *.log
+
+# SSL Certificates (local development only)
+cert.pem
+key.pem
