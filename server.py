@@ -168,12 +168,13 @@ def list_servers() -> str:
         return f"Error listing servers: {str(e)}"
 
 
-def run_streamable_http_server(host: str = "127.0.0.1", port: int = 8000) -> None:
+def run_streamable_http_server(host: str = "127.0.0.1", port: int = 8000, warmup: bool = True) -> None:
     """Run the MCP server with streamable-http transport.
 
     Args:
         host: Server host address (default: 127.0.0.1).
         port: Server port (default: 8000).
+        warmup: Pre-warm connections to enabled servers (default: True).
     """
     import uvicorn
 
@@ -196,23 +197,21 @@ def run_streamable_http_server(host: str = "127.0.0.1", port: int = 8000) -> Non
                         prompt=server.get("prompt", "#"),
                         timeout=server.get("timeout", 20),
                     )
-                    logger.info(f"✓ {server['name']} connection ready")
+                    logger.info(f"✓ {server['name']} connection ready (queries will be fast)")
                 except Exception as e:
                     logger.warning(f"⚠ Failed to pre-warm {server['name']}: {e}")
+
+    # Run warmup before starting server
+    if warmup:
+        asyncio.run(warmup_connections())
+        logger.info("✓ Connection warmup complete - server ready for fast queries")
+        logger.info("")
 
     # Use FastMCP's built-in streamable-http app
     app = mcp.streamable_http_app
     
     logger.info(f"Starting BGP Looking Glass MCP Server (streamable-http) on {host}:{port}")
     logger.info(f"MCP endpoint available at http://{host}:{port}/mcp")
-    
-    # Start warmup in background after server starts
-    def on_startup():
-        asyncio.create_task(warmup_connections())
-    
-    # We can't easily hook into uvicorn startup, so we'll let the first request trigger it
-    # But we'll add a health check endpoint that triggers warmup
-    
     uvicorn.run(app, host=host, port=port, log_level="info")
 
 
