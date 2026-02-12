@@ -195,7 +195,41 @@ Plain HTTP API without MCP protocol:
 python server.py --http-only
 ```
 
-## HTTP Endpoints
+### HTTPS Mode (Required by Claude Desktop)
+
+Claude Desktop requires HTTPS connections for MCP servers. Generate a self-signed certificate:
+
+```bash
+./generate_cert.sh
+```
+
+This creates `cert.pem` and `key.pem` in the current directory.
+
+Then run the server with HTTPS:
+
+```bash
+python server.py --ssl-cert cert.pem --ssl-key key.pem
+```
+
+Or with custom host/port:
+
+```bash
+python server.py --ssl-cert cert.pem --ssl-key key.pem --host 0.0.0.0 --port 8443
+```
+
+The server will start on `https://127.0.0.1:8000` with the MCP endpoint at `https://127.0.0.1:8000/mcp`
+
+**Note:** Claude Desktop may warn about the self-signed certificate, which is normal for development. You can safely proceed.
+
+### Using Production Certificates
+
+For production deployments, use certificates from a trusted CA (e.g., Let's Encrypt):
+
+```bash
+python server.py --ssl-cert /path/to/cert.pem --ssl-key /path/to/key.pem
+```
+
+## HTTP/HTTPS Endpoints
 
 ### Health Check
 
@@ -242,7 +276,27 @@ Returns all configured servers and their details.
 
 ## Claude Desktop Integration
 
-To use with Claude Desktop, add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+Claude Desktop requires HTTPS connections to MCP servers. Follow these steps:
+
+### Step 1: Generate SSL Certificate
+
+```bash
+./generate_cert.sh
+```
+
+This creates `cert.pem` and `key.pem` for local development.
+
+### Step 2: Run Server with HTTPS
+
+```bash
+python server.py --ssl-cert cert.pem --ssl-key key.pem
+```
+
+The server will run on `https://127.0.0.1:8000/mcp`
+
+### Step 3: Configure Claude Desktop
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, or the equivalent config file on Windows/Linux:
 
 ```json
 {
@@ -255,7 +309,26 @@ To use with Claude Desktop, add to `~/Library/Application Support/Claude/claude_
 }
 ```
 
-Then restart Claude Desktop. The tools will appear in the MCP tools list.
+**OR** for streamable-http transport (requires HTTPS):
+
+```json
+{
+  "mcpServers": {
+    "bgp-lg": {
+      "url": "https://localhost:8000/mcp",
+      "transport": "sse"
+    }
+  }
+}
+```
+
+For the streamable-http approach, make sure the server is running before starting Claude Desktop.
+
+### Step 4: Restart Claude Desktop
+
+After updating the config, restart Claude Desktop. The BGP Looking Glass tools will appear in the MCP tools list.
+
+**Note:** Claude Desktop may warn about the self-signed certificate. This is normal for development - you can safely ignore the warning and proceed.
 
 ## Supported Servers
 

@@ -305,12 +305,19 @@ def list_servers() -> str:
         return f"Error listing servers: {str(e)}"
 
 
-def run_streamable_http_server(host: str = "127.0.0.1", port: int = 8000) -> None:
+def run_streamable_http_server(
+    host: str = "127.0.0.1",
+    port: int = 8000,
+    ssl_certfile: Optional[str] = None,
+    ssl_keyfile: Optional[str] = None,
+) -> None:
     """Run the MCP server with streamable-http transport.
 
     Args:
         host: Server host address (default: 127.0.0.1).
         port: Server port (default: 8000).
+        ssl_certfile: Path to SSL certificate file for HTTPS.
+        ssl_keyfile: Path to SSL key file for HTTPS.
     """
     import uvicorn
 
@@ -320,18 +327,38 @@ def run_streamable_http_server(host: str = "127.0.0.1", port: int = 8000) -> Non
     # Use FastMCP's built-in streamable-http app
     app = mcp.streamable_http_app
     
-    logger.info(f"Starting MCP Server on {host}:{port}")
-    logger.info(f"Endpoint: http://{host}:{port}/mcp")
+    protocol = "https" if ssl_certfile else "http"
+    logger.info(f"Starting MCP Server on {protocol}://{host}:{port}")
+    logger.info(f"Endpoint: {protocol}://{host}:{port}/mcp")
     logger.info("Connections will be established lazily on first query")
-    uvicorn.run(app, host=host, port=port, log_level="info")
+    
+    if ssl_certfile and ssl_keyfile:
+        logger.info(f"Using SSL certificate: {ssl_certfile}")
+        uvicorn.run(
+            app,
+            host=host,
+            port=port,
+            ssl_certfile=ssl_certfile,
+            ssl_keyfile=ssl_keyfile,
+            log_level="info",
+        )
+    else:
+        uvicorn.run(app, host=host, port=port, log_level="info")
 
 
-def run_http_server(host: str = "127.0.0.1", port: int = 8000) -> None:
+def run_http_server(
+    host: str = "127.0.0.1",
+    port: int = 8000,
+    ssl_certfile: Optional[str] = None,
+    ssl_keyfile: Optional[str] = None,
+) -> None:
     """Run the MCP server as an HTTP streaming server.
 
     Args:
         host: Server host address (default: 127.0.0.1).
         port: Server port (default: 8000).
+        ssl_certfile: Path to SSL certificate file for HTTPS.
+        ssl_keyfile: Path to SSL key file for HTTPS.
     """
     import uvicorn
     from fastapi import FastAPI, HTTPException
@@ -369,8 +396,21 @@ def run_http_server(host: str = "127.0.0.1", port: int = 8000) -> None:
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
-    logger.info(f"Starting BGP Looking Glass MCP Server on {host}:{port}")
-    uvicorn.run(app, host=host, port=port, log_level="info")
+    protocol = "https" if ssl_certfile else "http"
+    logger.info(f"Starting BGP Looking Glass MCP Server on {protocol}://{host}:{port}")
+    
+    if ssl_certfile and ssl_keyfile:
+        logger.info(f"Using SSL certificate: {ssl_certfile}")
+        uvicorn.run(
+            app,
+            host=host,
+            port=port,
+            ssl_certfile=ssl_certfile,
+            ssl_keyfile=ssl_keyfile,
+            log_level="info",
+        )
+    else:
+        uvicorn.run(app, host=host, port=port, log_level="info")
 
 
 if __name__ == "__main__":
@@ -384,9 +424,11 @@ if __name__ == "__main__":
         # Check for explicit http mode
         use_http_only = len(sys.argv) > 1 and sys.argv[1] == "--http-only"
         
-        # Parse custom host/port arguments
+        # Parse custom host/port/SSL arguments
         host = "127.0.0.1"
         port = 8000
+        ssl_certfile = None
+        ssl_keyfile = None
         
         i = 1
         while i < len(sys.argv):
@@ -396,6 +438,12 @@ if __name__ == "__main__":
             elif sys.argv[i] == "--port" and i + 1 < len(sys.argv):
                 port = int(sys.argv[i + 1])
                 i += 2
+            elif sys.argv[i] == "--ssl-cert" and i + 1 < len(sys.argv):
+                ssl_certfile = sys.argv[i + 1]
+                i += 2
+            elif sys.argv[i] == "--ssl-key" and i + 1 < len(sys.argv):
+                ssl_keyfile = sys.argv[i + 1]
+                i += 2
             elif sys.argv[i] == "--http-only":
                 i += 1
             else:
@@ -404,8 +452,8 @@ if __name__ == "__main__":
         try:
             # Default to streamable-http server
             if use_http_only:
-                run_http_server(host, port)
+                run_http_server(host, port, ssl_certfile, ssl_keyfile)
             else:
-                run_streamable_http_server(host, port)
+                run_streamable_http_server(host, port, ssl_certfile, ssl_keyfile)
         finally:
             pass  # No persistent sessions to clean up
