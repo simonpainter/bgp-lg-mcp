@@ -177,39 +177,15 @@ def run_streamable_http_server(host: str = "127.0.0.1", port: int = 8000) -> Non
     """
     import uvicorn
 
-    # Pre-warm connections BEFORE starting server to avoid timeout on first request
-    async def warmup_connections():
-        """Eagerly connect to all enabled servers at startup."""
-        logger.info("Pre-warming BGP server connections...")
-        manager = get_session_manager()
-        config_data = load_config()
-        
-        for server in config_data.get("servers", []):
-            if server.get("enabled", True):
-                try:
-                    logger.info(f"  Connecting to {server['name']}...")
-                    session = await manager.get_session(
-                        host=server["host"],
-                        port=server.get("port", 23),
-                        username=server.get("username", ""),
-                        password=server.get("password", ""),
-                        prompt=server.get("prompt", "#"),
-                        timeout=server.get("timeout", 20),
-                    )
-                    logger.info(f"  ✓ {server['name']} ready")
-                except Exception as e:
-                    logger.warning(f"  ⚠ {server['name']}: {e}")
-        
-        logger.info("✓ Connection warmup complete")
-
-    # Run warmup before starting server (blocking, ensures ready before first client)
-    asyncio.run(warmup_connections())
+    # No pre-warming needed - connections are created lazily on first query
+    # within the same event loop as MCP requests
 
     # Use FastMCP's built-in streamable-http app
     app = mcp.streamable_http_app
     
     logger.info(f"Starting MCP Server on {host}:{port}")
     logger.info(f"Endpoint: http://{host}:{port}/mcp")
+    logger.info("Connections will be established lazily on first query")
     uvicorn.run(app, host=host, port=port, log_level="info")
 
 

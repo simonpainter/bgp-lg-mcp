@@ -41,15 +41,21 @@ class BGPServerSession:
         self.keepalive_interval = keepalive_interval
         
         self.client: Optional[BGPTelnetClient] = None
-        self._lock = asyncio.Lock()
+        self._lock: Optional[asyncio.Lock] = None  # Lazy initialization
         self._keepalive_task: Optional[asyncio.Task] = None
         self._is_running = False
         
         logger.info(f"Created session manager for {host}:{port}")
+    
+    def _get_lock(self) -> asyncio.Lock:
+        """Get or create lock in current event loop."""
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+        return self._lock
 
     async def connect(self) -> None:
         """Establish connection to BGP server."""
-        async with self._lock:
+        async with self._get_lock():
             if self.client is not None and self.client.writer is not None:
                 logger.debug(f"✓ Already connected to {self.host}")
                 return
@@ -93,7 +99,7 @@ class BGPServerSession:
         for attempt in range(max_retries):
             try:
                 # Ensure connection is alive
-                async with self._lock:
+                async with self._get_lock():
                     if self.client is None or self.client.writer is None:
                         logger.debug(f"Connection lost, reconnecting... (attempt {attempt + 1})")
                         self.client = None
@@ -109,7 +115,7 @@ class BGPServerSession:
                 logger.warning(f"✗ Command failed (attempt {attempt + 1}/{max_retries}): {e}")
                 
                 # Reset connection for retry
-                async with self._lock:
+                async with self._get_lock():
                     if self.client:
                         try:
                             await self.client.close()
@@ -150,7 +156,7 @@ class BGPServerSession:
 
     async def close(self) -> None:
         """Close the connection and stop keepalive."""
-        async with self._lock:
+        async with self._get_lock():
             self._is_running = False
             
             if self._keepalive_task:

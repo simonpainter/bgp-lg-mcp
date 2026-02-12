@@ -46,6 +46,7 @@ class BGPTelnetClient:
         self.timeout = timeout
         self.reader: Optional[asyncio.StreamReader] = None
         self.writer: Optional[asyncio.StreamWriter] = None
+        self._connection_loop: Optional[asyncio.AbstractEventLoop] = None
 
     def _handle_telnet_negotiation(self, data: bytes) -> tuple[bytes, bytes]:
         """Handle telnet protocol negotiation.
@@ -130,6 +131,8 @@ class BGPTelnetClient:
                 asyncio.open_connection(self.host, self.port),
                 timeout=self.timeout,
             )
+            # Track which event loop this connection was created in
+            self._connection_loop = asyncio.get_event_loop()
             logger.info(f"✓ Connected to {self.host}:{self.port}")
 
             # Read initial banner/prompt
@@ -292,6 +295,28 @@ class BGPTelnetClient:
         logger.info(f"✓ Read: {bytes_read} bytes, {len(decoded)} chars")
         return decoded
 
+    def _check_event_loop_mismatch(self) -> bool:
+        """Check if current event loop differs from connection loop.
+        
+        Returns:
+            True if there's a mismatch, False if loops match or connection is uninitialized.
+        """
+        if self._connection_loop is None or self.writer is None:
+            return False
+        
+        try:
+            current_loop = asyncio.get_event_loop()
+            # Check if the loops are different
+            if current_loop != self._connection_loop:
+                logger.debug(f"⚠ Event loop mismatch detected")
+                return True
+        except RuntimeError:
+            # No running event loop - this shouldn't happen but handle it
+            logger.debug("No running event loop")
+            return False
+        
+        return False
+
     async def send_command(self, command: str) -> str:
         """Send a command and get the response.
 
@@ -303,6 +328,15 @@ class BGPTelnetClient:
         """
         if not self.writer:
             raise ConnectionError("Not connected")
+        
+        # Check if event loop has changed since connection was created
+        if self._check_event_loop_mismatch():
+            logger.info(f"ℹ Event loop changed, clearing connection for lazy re-establishment")
+            # Don't close - just mark as disconnected so session manager will reconnect
+            self.reader = None
+            self.writer = None
+            self._connection_loop = None
+            raise ConnectionError("Event loop changed - reconnecting")
 
         try:
             logger.info(f"Executing command: {command}")
