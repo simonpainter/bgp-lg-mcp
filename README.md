@@ -22,8 +22,8 @@ This project wraps 7 public RouteViews servers into an **MCP (Model Context Prot
 - **CIDR notation support** - look up entire subnets
 - **Public IP validation** - blocks private/reserved address ranges for safety
 - **Simple, fast setup** - works with Claude Desktop in minutes
-- **Zero dependencies** on persistent connections or server infrastructure
-- **Works offline** - no external APIs, just direct telnet connections
+- **Direct telnet connections** - no heavy dependencies or complex infrastructure
+- **Real-time data** - queries live BGP data from public route servers
 
 ## Quick Start
 
