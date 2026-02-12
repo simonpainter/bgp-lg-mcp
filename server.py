@@ -118,11 +118,21 @@ async def route_lookup(destination: str, server: str = "route-server.ip.att.net"
         response = await query_bgp_server(server, command)
         return response
     except ValueError as e:
-        return f"Configuration error: {str(e)}"
+        error_msg = f"Configuration error: {str(e)}"
+        logger.error(error_msg)
+        return error_msg
+    except ConnectionError as e:
+        error_msg = f"Connection error: {str(e)} - The BGP server may be unreachable or not accepting connections"
+        logger.error(error_msg)
+        return error_msg
     except RuntimeError as e:
-        return f"Query error: {str(e)}"
+        error_msg = f"Query error: {str(e)}"
+        logger.error(error_msg)
+        return error_msg
     except Exception as e:
-        return f"Unexpected error: {str(e)}"
+        error_msg = f"Unexpected error: {type(e).__name__}: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        return error_msg
 
 
 @mcp.tool()
