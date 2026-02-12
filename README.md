@@ -1,135 +1,137 @@
 # BGP Looking Glass MCP Server
 
-A fast, lightweight BGP Looking Glass MCP (Model Context Protocol) server that queries BGP route information from multiple public RouteViews servers via simple on-demand telnet connections.
+Query live BGP routing information from public route servers via Claude Desktop or any MCP client.
+
+## What Is This?
+
+A **BGP Looking Glass** is an internet-accessible service that exposes BGP (Border Gateway Protocol) routing data. BGP is the protocol that powers the internet's routing infrastructure. Looking glasses let you see what routes a particular BGP speaker has learned and how it would route traffic to a given destination.
+
+This project wraps 7 public RouteViews servers into an **MCP (Model Context Protocol) server**, making BGP queries available to Claude Desktop and other AI assistants. Now you can ask Claude about internet routing with live, authoritative data.
+
+**Example questions Claude can answer:**
+- "What's the AS path to 8.8.8.0/24?"
+- "Is this prefix routed?"
+- "How many BGP neighbors does the Linx route server have?"
+- "Compare routes to 1.1.1.1 across different regions"
 
 ## Features
 
-- **Fast BGP queries** - RouteViews Linx responds in ~50ms
-- **Query BGP routes** from 7 configured RouteViews servers globally
-- **BGP summary statistics** - View router info, AS number, and neighbor status
-- **IPv4 and IPv6 support** - Query both address families
-- **CIDR notation support** - Look up entire subnets (e.g., `1.1.1.0/24`)
-- **Public IP validation** - Blocks private/reserved address ranges
-- **Simple on-demand connections** - No session persistence overhead
-- **Multiple transport modes** - MCP stdio, streamable-http, or REST API
-- **Configurable servers** - Easy to add/remove looking-glass servers
+- **Query live BGP routes** from 7 globally-distributed public route servers
+- **Retrieve BGP summary statistics** including router ID, AS number, neighbor count
+- **IPv4 and IPv6 support** - works with both address families
+- **CIDR notation support** - look up entire subnets
+- **Public IP validation** - blocks private/reserved address ranges for safety
+- **Simple, fast setup** - works with Claude Desktop in minutes
+- **Zero dependencies** on persistent connections or server infrastructure
+- **Works offline** - no external APIs, just direct telnet connections
 
-## How It Works
+## Quick Start
 
-The server uses **simple on-demand connections** to public RouteViews servers:
-1. Creates a new telnet connection when a query is made
-2. Executes the BGP command (e.g., `show ip bgp <destination>`)
-3. Returns the raw router output
-4. Closes the connection
+### 1. Install
 
-This approach is fast enough for RouteViews servers (typical response: 0.5-1.5s per query including connection time) and avoids the complexity of persistent session management.
+```bash
+pip install -e .
+```
+
+### 2. Configure Claude Desktop
+
+Add this to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "bgp-lg": {
+      "command": "python3",
+      "args": ["/path/to/bgp-lg-mcp/server.py", "--stdio"]
+    }
+  }
+}
+```
+
+### 3. Restart Claude Desktop
+
+The BGP Looking Glass tools will appear in your MCP tools list. Start asking about BGP!
 
 ## Available Tools
 
-### `route_lookup` - Look Up BGP Routes
+### `route_lookup` - Query BGP Routes
 
-Query a specific IP address or subnet on a BGP looking-glass server.
+Look up how a specific IP address or subnet would be routed.
 
 **Parameters:**
-- `destination` (required): IPv4 address (e.g., `1.1.1.1`), IPv6 address (e.g., `2001:4860:4860::8888`), or CIDR subnet (e.g., `1.1.1.0/24`)
-- `server` (optional): BGP server to query. Options:
-  - `RouteViews Linx` ⚡ Default - fastest (~50ms)
-  - `RouteViews Equinix` (~330ms)
-  - `RouteViews ISC` (~530ms)
-  - `RouteViews Main` (~740ms)
-  - `RouteViews WIDE` (~1.1s)
-  - `RouteViews Chicago`
-  - `RouteViews Sydney` (global coverage)
+- `destination` - IPv4/IPv6 address or CIDR subnet (e.g., `8.8.8.0/24`)
+- `server` - Which route server to query (default: RouteViews Linx)
 
-**What it returns:**
-Raw BGP route lookup output showing:
-- Matching routes and next-hop information
-- AS path details
-- Route attributes
-- Community information
-- Prefix information
+**Returns:** Raw BGP lookup output including matching routes, AS paths, next-hop information, and route attributes.
 
-**Example usage:**
+**Example:**
 ```
 route_lookup(destination="1.1.1.1")
-route_lookup(destination="8.8.8.0/24", server="RouteViews Equinix")
 route_lookup(destination="2001:4860:4860::8888", server="RouteViews Sydney")
 ```
 
-**Validation:**
-- Ensures destination is a public IP (blocks private ranges like 10.x.x.x, 192.168.x.x)
-- Supports CIDR notation (/24, /32, etc.)
-- Works with both IPv4 and IPv6
-
 ---
 
-### `bgp_summary` - Get BGP Router Statistics
+### `bgp_summary` - Get Router Statistics
 
-Retrieve BGP summary information from a route server, showing router details and BGP neighbor status.
+Retrieve BGP summary information from a route server.
 
 **Parameters:**
-- `server` (optional): BGP server to query (same options as `route_lookup`; default: RouteViews Linx)
+- `server` - Which route server to query (default: RouteViews Linx)
 
-**What it returns:**
-BGP summary output showing:
-- **Router Identifier** - BGP router ID
-- **Local AS Number** - The autonomous system number
-- **RIB Statistics** - Number of routes and memory usage
-- **Neighbor Count** - Total number of BGP peers
-- **Detailed neighbor table** with:
-  - Neighbor IP address and AS number
-  - Messages received/sent
-  - Session uptime
-  - Prefixes received and sent
-  - Neighbor description/name
+**Returns:** BGP summary output showing:
+- Router BGP ID and AS number
+- Number of learned routes (RIB entries)
+- Total BGP neighbors and their status
+- Detailed neighbor table with peer information, session uptime, and prefix counts
 
-**Example usage:**
+**Example:**
 ```
 bgp_summary()
 bgp_summary(server="RouteViews Equinix")
 ```
 
 **Use cases:**
-- Check if a route server is healthy and connected
-- See how many neighbors a route server has
-- Monitor which peers are actively advertising routes
-- Verify session status with specific networks
+- Verify a route server is healthy
+- Monitor BGP session status with major networks
+- See which peers are actively advertising routes
 
 ---
 
 ### `list_servers` - Show Available Servers
 
-List all configured BGP looking-glass servers and their details.
+Display all configured BGP looking-glass servers.
 
-**Parameters:** None
+**Returns:** Server names, status (enabled/disabled), hostnames, and connection method.
 
-**What it returns:**
-- Server name and status (enabled/disabled)
-- Hostname/IP address and port
-- Connection method
-
-**Example usage:**
+**Example:**
 ```
 list_servers()
 ```
 
-## Installation
+## Supported Route Servers
 
-### Using pip
+7 globally-distributed public RouteViews servers, all freely accessible:
 
-```bash
-pip install -e .
-```
+| Server | Location | Response Time | Coverage |
+|--------|----------|---------------|----------|
+| RouteViews Linx | London, UK | ~50ms | ⚡ **Fastest - use by default** |
+| RouteViews Equinix | Multiple locations | ~330ms | Good alternative |
+| RouteViews ISC | Multiple locations | ~530ms | Good alternative |
+| RouteViews Main | Oregon, USA | ~740ms | Largest BGP view |
+| RouteViews WIDE | Tokyo, Japan | ~1.1s | Asia-Pacific coverage |
+| RouteViews Chicago | Chicago, USA | Variable | North America |
+| RouteViews Sydney | Sydney, Australia | Variable | Oceania coverage |
 
-### Using uv
-
-```bash
-uv pip install -e .
-```
+All servers are:
+- ✅ Publicly accessible (no registration required)
+- ✅ Freely available 24/7
+- ✅ Updated in real-time from BGP feeds
+- ✅ Maintained by the University of Oregon Route Views Project
 
 ## Configuration
 
-BGP servers are configured in `config.json`:
+Edit `config.json` to modify route servers or add new ones:
 
 ```json
 {
@@ -151,332 +153,188 @@ BGP servers are configured in `config.json`:
 
 ### Configuration Fields
 
-- **name** - Server identifier (used in tool parameters)
-- **host** - Hostname or IP address
-- **port** - Telnet port (default: 23)
-- **connection_method** - Currently "telnet" (SSH support coming)
-- **username** - Login username (empty for anonymous access)
-- **password** - Login password (empty if not required)
-- **prompt** - Command prompt indicator (e.g., `>`, `#`)
-- **timeout** - Connection timeout in seconds (default: 15)
-- **enabled** - Toggle server availability (true/false)
+- **name** - Server identifier (used when specifying which server to query)
+- **host** - Hostname or IP address of the BGP router
+- **port** - Telnet port (almost always 23)
+- **connection_method** - Currently "telnet"; SSH support can be added
+- **username** - Login username (empty = anonymous access)
+- **password** - Login password
+- **prompt** - Command prompt indicator (used to detect when responses are complete)
+- **timeout** - Connection timeout in seconds
+- **enabled** - Enable/disable without removing from config
 
 ## Running the Server
 
-### Default Mode (Streamable-HTTP)
-
-Best for web-based MCP clients:
+### MCP Stdio Mode (Recommended for Claude Desktop)
 
 ```bash
-python server.py
+python3 server.py --stdio
+```
+
+This is the default for Claude Desktop integration. The server runs in the background and communicates via stdin/stdout.
+
+### Streamable-HTTP Mode
+
+For web-based MCP clients or testing:
+
+```bash
+python3 server.py
 ```
 
 Starts on `http://127.0.0.1:8000` with MCP endpoint at `/mcp`
 
-### Custom Host/Port
-
+Custom host/port:
 ```bash
-python server.py --host 0.0.0.0 --port 8080
-```
-
-### MCP Stdio Mode
-
-For Claude Desktop and other stdio-compatible MCP clients:
-
-```bash
-python server.py --stdio
+python3 server.py --host 0.0.0.0 --port 8080
 ```
 
 ### REST API Mode
 
-Plain HTTP API without MCP protocol:
+For direct HTTP API access:
 
 ```bash
-python server.py --http-only
+python3 server.py --http-only
 ```
 
-### HTTPS Mode (Required by Claude Desktop)
+Available endpoints:
+- `GET /health` - Server health check
+- `POST /route-lookup?destination=1.1.1.1&server=RouteViews%20Linx` - Route lookup
+- `GET /servers` - List configured servers
 
-Claude Desktop requires HTTPS connections for MCP servers. Generate a self-signed certificate:
+## How It Works
+
+1. **You ask Claude a BGP question** - "What's the AS path to 1.1.1.1?"
+2. **Claude calls the appropriate MCP tool** - `route_lookup` with your query
+3. **The tool connects to a public route server** via telnet
+4. **Executes the BGP command** - `show ip bgp <destination>`
+5. **Returns the raw router output** to Claude
+6. **Claude interprets and summarizes** the results for you
+
+All communication uses simple on-demand telnet connections - no persistent sessions, no complex infrastructure.
+
+## Examples
+
+### Check if a subnet is routed
+
+```
+User: Is 203.0.113.0/24 currently routed to the internet?
+Claude: route_lookup(destination="203.0.113.0/24")
+Result: [Shows all routes matching that prefix from the route server]
+Claude: Based on the BGP data, this subnet is being announced by AS65001 with these paths...
+```
+
+### Compare routing across regions
+
+```
+User: How does traffic to Google DNS (8.8.8.8) route from different regions?
+Claude: Calls route_lookup for 8.8.8.8 with different servers
+Claude: Shows how different route servers see the path to Google's infrastructure
+```
+
+### Monitor route server health
+
+```
+User: Is the Linx route server operating normally?
+Claude: bgp_summary(server="RouteViews Linx")
+Result: Shows 63 active BGP neighbors, millions of routes, healthy sessions
+Claude: Yes, the Linx route server is operating normally with X neighbors...
+```
+
+## Requirements
+
+- Python 3.7+
+- Dependencies listed in `requirements.txt` (FastAPI, uvicorn, mcp)
+
+## Installation
 
 ```bash
-./generate_cert.sh
+git clone https://github.com/yourusername/bgp-lg-mcp.git
+cd bgp-lg-mcp
+pip install -e .
 ```
-
-This creates `cert.pem` and `key.pem` in the current directory.
-
-Then run the server with HTTPS:
-
-```bash
-python server.py --ssl-cert cert.pem --ssl-key key.pem
-```
-
-Or with custom host/port:
-
-```bash
-python server.py --ssl-cert cert.pem --ssl-key key.pem --host 0.0.0.0 --port 8443
-```
-
-The server will start on `https://127.0.0.1:8000` with the MCP endpoint at `https://127.0.0.1:8000/mcp`
-
-**Note:** Claude Desktop may warn about the self-signed certificate, which is normal for development. You can safely proceed.
-
-### Using Production Certificates
-
-For production deployments, use certificates from a trusted CA (e.g., Let's Encrypt):
-
-```bash
-python server.py --ssl-cert /path/to/cert.pem --ssl-key /path/to/key.pem
-```
-
-## HTTP/HTTPS Endpoints
-
-### Health Check
-
-```
-GET /health
-```
-
-Returns server status.
-
-### MCP Streamable-HTTP
-
-```
-POST /mcp
-```
-
-Main MCP protocol endpoint for web-based clients.
-
-### Route Lookup (REST API)
-
-```
-POST /route-lookup?destination=1.1.1.1&server=RouteViews%20Linx
-```
-
-Query parameters:
-- `destination` (required) - IPv4/IPv6 address or CIDR subnet
-- `server` (optional) - Server name (default: RouteViews Linx)
-
-Response:
-```json
-{
-  "destination": "1.1.1.1",
-  "server": "RouteViews Linx",
-  "result": "... BGP route output ..."
-}
-```
-
-### List Servers (REST API)
-
-```
-GET /servers
-```
-
-Returns all configured servers and their details.
-
-## Claude Desktop Integration
-
-### ⚡ Quickest Setup (Recommended)
-
-Use **stdio mode** - no HTTPS needed, no server to run:
-
-```bash
-./start-server.sh
-```
-
-Or manually:
-
-```bash
-python server.py --stdio
-```
-
-Then add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
-
-```json
-{
-  "mcpServers": {
-    "bgp-lg": {
-      "command": "python",
-      "args": ["/path/to/bgp-lg-mcp/server.py", "--stdio"]
-    }
-  }
-}
-```
-
-Restart Claude Desktop and the tools will appear in your MCP tools list.
-
----
-
-### Advanced: Streamable-HTTP with HTTPS
-
-If you need to run a separate server (streamable-http transport), HTTPS is required. However, **Claude Desktop has strict SSL certificate validation** and won't accept self-signed certificates for remote connections.
-
-**Options:**
-
-1. **Use a proper CA-signed certificate** (production):
-   ```bash
-   python server.py --ssl-cert /path/to/ca-signed-cert.pem --ssl-key /path/to/ca-key.pem
-   ```
-   Then add to Claude Desktop config:
-   ```json
-   {
-     "mcpServers": {
-       "bgp-lg": {
-         "url": "https://your-domain.com:8000/mcp",
-         "transport": "sse"
-       }
-     }
-   }
-   ```
-
-2. **Use mkcert for trusted self-signed certificates** (development):
-   ```bash
-   # Install mkcert: https://github.com/FiloSottile/mkcert
-   mkcert localhost 127.0.0.1
-   python server.py --ssl-cert localhost.pem --ssl-key localhost-key.pem
-   ```
-   Then add to Claude Desktop config:
-   ```json
-   {
-     "mcpServers": {
-       "bgp-lg": {
-         "url": "https://localhost:8000/mcp",
-         "transport": "sse"
-       }
-     }
-   }
-   ```
-
-3. **Stick with stdio mode** (simplest and recommended):
-   No HTTPS, no certificate issues, instant setup.
-
----
-
-### Restart Claude Desktop
-
-After updating the config, restart Claude Desktop. The BGP Looking Glass tools will appear in your MCP tools list.
-
-## Supported Servers
-
-The server comes pre-configured with 7 RouteViews servers:
-
-| Server | Location | Response Time | Notes |
-|--------|----------|---------------|-------|
-| RouteViews Linx | London, UK | ~50ms | ⚡ **Fastest** - Use this by default |
-| RouteViews Equinix | Various | ~330ms | Good alternative |
-| RouteViews ISC | Various | ~530ms | Good alternative |
-| RouteViews Main | Oregon, USA | ~740ms | Largest BGP view |
-| RouteViews WIDE | Tokyo, Japan | ~1.1s | Asia-Pacific coverage |
-| RouteViews Chicago | Chicago, USA | Variable | North America |
-| RouteViews Sydney | Sydney, Australia | Variable | Oceania coverage |
-
-All servers are:
-- Publicly accessible (no special registration required)
-- Running Cisco IOS-XR with `show ip bgp` command support
-- Updated in real-time from global BGP feeds
-- Maintained by the University of Oregon Route Views Project
-
-### Adding More Servers
-
-To add a new looking-glass server, add an entry to `config.json`:
-
-```json
-{
-  "name": "Server Name",
-  "host": "route-server.example.com",
-  "port": 23,
-  "connection_method": "telnet",
-  "username": "optional_username",
-  "password": "optional_password",
-  "prompt": ">",
-  "timeout": 15,
-  "enabled": true
-}
-```
-
-## Performance
-
-- **Connection time**: 50ms - 1.1s depending on server
-- **Command execution**: Typically <500ms
-- **Total query time**: 0.5s - 1.5s per query
-
-No startup delay or connection pre-warming needed.
 
 ## Development
 
-Install with development dependencies:
+Install with dev dependencies:
 
 ```bash
 pip install -e ".[dev]"
 ```
 
+## Performance
+
+- **Connection time**: 50ms - 1.1s (depending on server)
+- **Command execution**: Typically <500ms
+- **Total query time**: 0.5s - 1.5s per query
+- **No startup delay** - tools available immediately
+
 ## Troubleshooting
 
-### "Connection Error - Check if your MCP server is running and proxy token is correct"
+### Connection Error in Claude Desktop
 
-**Solution:** Use **stdio mode** instead of streamable-http:
+**Error:** "Connection Error - Check if your MCP server is running..."
+
+**Solution:** Ensure the server is running:
 ```bash
-python server.py --stdio
+python3 server.py --stdio
 ```
 
-The error typically occurs with streamable-http because Claude Desktop strictly validates SSL certificates and won't accept self-signed certificates.
+And verify the config path in `claude_desktop_config.json` is correct.
 
-### HTTPS doesn't work with Claude Desktop
+### Route lookup returns no results
 
-**Reason:** Claude Desktop requires certificates signed by a trusted Certificate Authority for remote/streamable-http connections.
+**Possible causes:**
+- The destination is a private IP (10.x.x.x, 192.168.x.x, etc.) - these are blocked for safety
+- The route server is temporarily unreachable
+- The server is overloaded (try a different server)
 
-**Solutions:**
-1. Use stdio mode (no HTTPS needed) - **recommended**
-2. Use mkcert to create trusted development certificates
-3. Use a proper CA-signed certificate for production
-
-See the "Claude Desktop Integration" section above for detailed setup.
+**Solution:** Try a different server or verify the IP is public:
+```
+route_lookup(destination="1.1.1.1", server="RouteViews Equinix")
+```
 
 ### Server won't start
 
 **Check:**
-- Python 3.7+ is installed
-- All dependencies are installed: `pip install -e .`
-- Port 8000 isn't in use: `lsof -i :8000` (macOS/Linux)
-- Certificate files exist if using HTTPS: `ls -la *.pem`
+- Python 3.7+ is installed: `python3 --version`
+- Dependencies are installed: `pip install -e .`
+- Port 8000 isn't in use (for streamable-http mode): `lsof -i :8000`
 
-### Route lookup returns empty results
+## Limitations
 
-**Check:**
-- The destination IP is public (not 10.x.x.x, 192.168.x.x, etc.)
-- The server is reachable: `telnet route-views.linx.routeviews.org 23`
-- Try a different server in case one is down
-- Check server logs for error details
+- **Telnet only** - Currently only supports telnet connections (RFC 854 compatible)
+- **Public IPs only** - Private/reserved address ranges are blocked
+- **No authentication required** - All configured servers are public and free
+- **Query rate limited** - No specific rate limiting, but be respectful of public resources
 
-## Development
+## Contributing
 
-## Common BGP Queries
-
-### Check if a prefix is routed
-
-```
-route_lookup(destination="8.8.8.0/24")
-```
-
-### Monitor a large provider's health
-
-```
-bgp_summary(server="RouteViews Equinix")
-```
-
-### Compare routes across regions
-
-```
-route_lookup(destination="1.1.1.1", server="RouteViews Linx")
-route_lookup(destination="1.1.1.1", server="RouteViews Sydney")
-```
-
-### Check IPv6 routing
-
-```
-route_lookup(destination="2001:4860:4860::8888")
-```
+Contributions welcome! Areas of interest:
+- SSH support for servers that don't support telnet
+- Additional public route servers
+- Performance optimizations
+- Additional BGP query types
+- Better error handling and diagnostics
 
 ## License
 
 MIT
+
+## About BGP and Looking Glasses
+
+**BGP (Border Gateway Protocol)** is the routing protocol of the internet. It allows autonomous systems (networks) to exchange routing information.
+
+**A Looking Glass** is a service that exposes a BGP speaker's routing table and allows queries. They're invaluable for:
+- Troubleshooting routing issues
+- Verifying prefix announcements
+- Monitoring BGP session health
+- Network operations and visibility
+
+Learn more:
+- [Route Views Project](http://www.routeviews.org/) - Maintains the public servers used here
+- [BGP Basics](https://en.wikipedia.org/wiki/Border_Gateway_Protocol)
+- [Looking Glass Servers](http://www.routeviews.org/routeviews/index.php?type=lg)
+
+## Support
+
+If you encounter issues or have suggestions, please open an issue on GitHub or check the troubleshooting section above.
