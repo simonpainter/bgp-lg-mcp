@@ -94,7 +94,7 @@ async def query_bgp_server(server_name: str, command: str) -> str:
 
 
 @mcp.tool()
-def route_lookup(destination: str, server: str = "route-server.ip.att.net") -> str:
+async def route_lookup(destination: str, server: str = "route-server.ip.att.net") -> str:
     """Look up a route on a BGP looking-glass server.
 
     Args:
@@ -113,9 +113,9 @@ def route_lookup(destination: str, server: str = "route-server.ip.att.net") -> s
     logger.info(f"Looking up {ip_type} {destination} on {server}")
 
     try:
-        # Run async operation
+        # Call async function directly (no asyncio.run needed)
         command = f"show route {destination}"
-        response = asyncio.run(query_bgp_server(server, command))
+        response = await query_bgp_server(server, command)
         return response
     except ValueError as e:
         return f"Configuration error: {str(e)}"
