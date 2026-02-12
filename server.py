@@ -1,6 +1,5 @@
 """BGP Looking Glass MCP Server."""
 
-import asyncio
 import json
 import logging
 import sys
@@ -11,7 +10,6 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.stdio import stdio_server
 
 from bgp_client import BGPTelnetClient
-from session_manager import get_session_manager, close_session_manager
 from validation import validate_ip_or_cidr, get_ip_type
 
 # Setup logging
@@ -62,15 +60,15 @@ def get_server_config(server_name: str) -> Optional[dict]:
     return None
 
 
-async def query_bgp_server(server_name: str, command: str) -> str:
-    """Query a BGP looking-glass server using persistent session.
+async def query_bgp_server(server_name: str, destination: str) -> str:
+    """Query a BGP looking-glass server for route information.
 
     Args:
         server_name: Name of the server to query.
-        command: Command to send to the server.
+        destination: IP address or CIDR subnet to look up.
 
     Returns:
-        Server response.
+        Server response with route details.
     """
     server_config = get_server_config(server_name)
     if not server_config:
@@ -79,21 +77,27 @@ async def query_bgp_server(server_name: str, command: str) -> str:
     if not server_config.get("enabled", True):
         raise ValueError(f"Server '{server_name}' is disabled")
 
-    manager = get_session_manager()
-    
     try:
-        # Get or create a persistent session
-        session = await manager.get_session(
+        # Create on-demand connection (fast enough for RouteViews servers)
+        client = BGPTelnetClient(
             host=server_config["host"],
             port=server_config.get("port", 23),
             username=server_config.get("username", ""),
             password=server_config.get("password", ""),
             prompt=server_config.get("prompt", "#"),
-            timeout=server_config.get("timeout", 20),
+            timeout=server_config.get("timeout", 15),
         )
         
-        # Send command using the persistent connection
-        response = await session.send_command(command)
+        # Connect
+        await client.connect()
+        
+        # Use BGP-specific command (show ip bgp for Cisco-based route servers)
+        command = f"show ip bgp {destination}"
+        response = await client.send_command(command)
+        
+        # Close connection
+        await client.close()
+        
         return response
         
     except Exception as e:
@@ -101,12 +105,12 @@ async def query_bgp_server(server_name: str, command: str) -> str:
 
 
 @mcp.tool()
-async def route_lookup(destination: str, server: str = "route-server.ip.att.net") -> str:
+async def route_lookup(destination: str, server: str = "RouteViews Linx") -> str:
     """Look up a route on a BGP looking-glass server.
 
     Args:
         destination: IPv4/IPv6 address or CIDR subnet (e.g., 1.1.1.1 or 1.1.1.0/24).
-        server: Name of the BGP server to query (default: route-server.ip.att.net).
+        server: Name of the BGP server to query (default: RouteViews Linx - fastest).
 
     Returns:
         Route lookup results from the BGP server.
@@ -120,9 +124,7 @@ async def route_lookup(destination: str, server: str = "route-server.ip.att.net"
     logger.info(f"Looking up {ip_type} {destination} on {server}")
 
     try:
-        # Call async function directly (no asyncio.run needed)
-        command = f"show route {destination}"
-        response = await query_bgp_server(server, command)
+        response = await query_bgp_server(server, destination)
         return response
     except ValueError as e:
         error_msg = f"Configuration error: {str(e)}"
@@ -207,7 +209,7 @@ def run_http_server(host: str = "127.0.0.1", port: int = 8000) -> None:
         return {"status": "ok"}
 
     @app.post("/route-lookup")
-    async def api_route_lookup(destination: str, server: str = "route-server.ip.att.net"):
+    async def api_route_lookup(destination: str, server: str = "RouteViews Linx"):
         """HTTP endpoint for route lookup."""
         # Validate destination
         is_valid, message = validate_ip_or_cidr(destination)
@@ -215,8 +217,7 @@ def run_http_server(host: str = "127.0.0.1", port: int = 8000) -> None:
             raise HTTPException(status_code=400, detail=f"Invalid destination: {message}")
 
         try:
-            command = f"show route {destination}"
-            response = await query_bgp_server(server, command)
+            response = await query_bgp_server(server, destination)
             return {"destination": destination, "server": server, "result": response}
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
@@ -243,8 +244,7 @@ if __name__ == "__main__":
         try:
             mcp.run()
         finally:
-            # Clean up sessions on shutdown
-            asyncio.run(close_session_manager())
+            pass  # No persistent sessions to clean up
     else:
         # Check for explicit http mode
         use_http_only = len(sys.argv) > 1 and sys.argv[1] == "--http-only"
@@ -273,5 +273,4 @@ if __name__ == "__main__":
             else:
                 run_streamable_http_server(host, port)
         finally:
-            # Clean up sessions on shutdown
-            asyncio.run(close_session_manager())
+            pass  # No persistent sessions to clean up

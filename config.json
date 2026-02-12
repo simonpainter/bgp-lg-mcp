@@ -1,37 +1,81 @@
 {
   "servers": [
     {
-      "name": "route-server.ip.att.net",
-      "host": "route-server.ip.att.net",
+      "name": "RouteViews Linx",
+      "host": "route-views.linx.routeviews.org",
       "port": 23,
       "connection_method": "telnet",
-      "username": "rviews",
-      "password": "rviews",
-      "prompt": "rviews@route-server.ip.att.net>",
-      "timeout": 20,
+      "username": "",
+      "password": "",
+      "prompt": ">",
+      "timeout": 15,
       "enabled": true
     },
     {
-      "name": "route-views.routeviews.org",
+      "name": "RouteViews Equinix",
+      "host": "route-views.eqix.routeviews.org",
+      "port": 23,
+      "connection_method": "telnet",
+      "username": "",
+      "password": "",
+      "prompt": ">",
+      "timeout": 15,
+      "enabled": true
+    },
+    {
+      "name": "RouteViews ISC",
+      "host": "route-views.isc.routeviews.org",
+      "port": 23,
+      "connection_method": "telnet",
+      "username": "",
+      "password": "",
+      "prompt": ">",
+      "timeout": 15,
+      "enabled": true
+    },
+    {
+      "name": "RouteViews Main",
       "host": "route-views.routeviews.org",
       "port": 23,
       "connection_method": "telnet",
       "username": "rviews",
       "password": "rviews",
-      "prompt": "route-views@route-views>",
-      "timeout": 20,
-      "enabled": false
+      "prompt": ">",
+      "timeout": 15,
+      "enabled": true
     },
     {
-      "name": "demo",
-      "host": "demo.bgp-lg.local",
+      "name": "RouteViews WIDE",
+      "host": "route-views.wide.routeviews.org",
       "port": 23,
       "connection_method": "telnet",
-      "username": "demo",
-      "password": "demo",
-      "prompt": "demo#",
-      "timeout": 10,
-      "enabled": false
+      "username": "",
+      "password": "",
+      "prompt": ">",
+      "timeout": 15,
+      "enabled": true
+    },
+    {
+      "name": "RouteViews Chicago",
+      "host": "route-views.chicago.routeviews.org",
+      "port": 23,
+      "connection_method": "telnet",
+      "username": "",
+      "password": "",
+      "prompt": ">",
+      "timeout": 15,
+      "enabled": true
+    },
+    {
+      "name": "RouteViews Sydney",
+      "host": "route-views.sydney.routeviews.org",
+      "port": 23,
+      "connection_method": "telnet",
+      "username": "",
+      "password": "",
+      "prompt": ">",
+      "timeout": 15,
+      "enabled": true
     }
   ]
 }
