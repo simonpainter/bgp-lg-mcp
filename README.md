@@ -188,19 +188,6 @@ Custom host/port:
 python3 server.py --host 0.0.0.0 --port 8080
 ```
 
-### REST API Mode
-
-For direct HTTP API access:
-
-```bash
-python3 server.py --http-only
-```
-
-Available endpoints:
-- `GET /health` - Server health check
-- `POST /route-lookup?destination=1.1.1.1&server=RouteViews%20Linx` - Route lookup
-- `GET /servers` - List configured servers
-
 ## How It Works
 
 1. **You ask Claude a BGP question** - "What's the AS path to 1.1.1.1?"
@@ -245,61 +232,6 @@ Claude: Yes, the Linx route server is operating normally with X neighbors...
 - Python 3.7+
 - Dependencies listed in `requirements.txt` (FastAPI, uvicorn, mcp)
 
-## Installation
-
-```bash
-git clone https://github.com/yourusername/bgp-lg-mcp.git
-cd bgp-lg-mcp
-pip install -e .
-```
-
-## Development
-
-Install with dev dependencies:
-
-```bash
-pip install -e ".[dev]"
-```
-
-## Performance
-
-- **Connection time**: 50ms - 1.1s (depending on server)
-- **Command execution**: Typically <500ms
-- **Total query time**: 0.5s - 1.5s per query
-- **No startup delay** - tools available immediately
-
-## Troubleshooting
-
-### Connection Error in Claude Desktop
-
-**Error:** "Connection Error - Check if your MCP server is running..."
-
-**Solution:** Ensure the server is running:
-```bash
-python3 server.py --stdio
-```
-
-And verify the config path in `claude_desktop_config.json` is correct.
-
-### Route lookup returns no results
-
-**Possible causes:**
-- The destination is a private IP (10.x.x.x, 192.168.x.x, etc.) - these are blocked for safety
-- The route server is temporarily unreachable
-- The server is overloaded (try a different server)
-
-**Solution:** Try a different server or verify the IP is public:
-```
-route_lookup(destination="1.1.1.1", server="RouteViews Equinix")
-```
-
-### Server won't start
-
-**Check:**
-- Python 3.7+ is installed: `python3 --version`
-- Dependencies are installed: `pip install -e .`
-- Port 8000 isn't in use (for streamable-http mode): `lsof -i :8000`
-
 ## Limitations
 
 - **Telnet only** - Currently only supports telnet connections (RFC 854 compatible)
@@ -319,22 +251,3 @@ Contributions welcome! Areas of interest:
 ## License
 
 MIT
-
-## About BGP and Looking Glasses
-
-**BGP (Border Gateway Protocol)** is the routing protocol of the internet. It allows autonomous systems (networks) to exchange routing information.
-
-**A Looking Glass** is a service that exposes a BGP speaker's routing table and allows queries. They're invaluable for:
-- Troubleshooting routing issues
-- Verifying prefix announcements
-- Monitoring BGP session health
-- Network operations and visibility
-
-Learn more:
-- [Route Views Project](http://www.routeviews.org/) - Maintains the public servers used here
-- [BGP Basics](https://en.wikipedia.org/wiki/Border_Gateway_Protocol)
-- [Looking Glass Servers](http://www.routeviews.org/routeviews/index.php?type=lg)
-
-## Support
-
-If you encounter issues or have suggestions, please open an issue on GitHub or check the troubleshooting section above.
