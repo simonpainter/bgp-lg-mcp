@@ -70,14 +70,13 @@ python3 server.py --http-only
 
 ## Testing
 
-There is no automated test suite yet. Validate changes manually:
+Tests use `pytest` and live in the `tests/` directory. Run them with:
 
 ```bash
-# Verify tool execution end-to-end
-python3 server.py --stdio
+pytest tests/
 ```
 
-When adding new features, write tests consistent with standard `pytest` patterns and place them in a `tests/` directory.
+When adding new features, write tests consistent with existing `pytest` patterns in that directory.
 
 ## Key Constraints
 
