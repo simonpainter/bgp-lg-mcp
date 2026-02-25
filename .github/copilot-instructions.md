@@ -58,7 +58,7 @@ python3 server.py --http-only
 
 - Follow existing patterns: type hints on all function signatures, docstrings on all public functions/methods (Google style: Args/Returns)
 - Use `logger = logging.getLogger(__name__)` in each module; log with `logger.info/debug/warning/error`
-- Raise `ConnectionError` for connection failures, `ValueError` for configuration errors, `RuntimeError` for query failures; catch these specifically in tool handlers
+- Use `ValueError` for configuration/validation errors. `BGPTelnetClient.connect()` may raise `ConnectionError` on connection failures, but `query_bgp_server()` currently wraps all exceptions into `RuntimeError`, so MCP tool handlers should expect to catch `ValueError` for bad input and `RuntimeError` for any query/connection failure.
 - All network I/O must be `async`; do not use blocking calls
 - Validate all user-supplied IP addresses and CIDR prefixes with `validate_ip_or_cidr()` from `validation.py` before querying servers
 - Only public IP addresses are permitted; private, loopback, and link-local ranges are rejected
