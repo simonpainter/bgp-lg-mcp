@@ -31,3 +31,9 @@ include = [
 
 [project.scripts]
 bgp-lg-mcp = "server:run_http_server"
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: marks tests as integration tests that require network access (deselect with '-m \"not integration\"')",
+]
+asyncio_mode = "auto"
