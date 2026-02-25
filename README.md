@@ -13,11 +13,13 @@ This project wraps 7 public RouteViews servers into an **MCP (Model Context Prot
 - "What's the AS path to 8.8.8.0/24?"
 - "Is this prefix routed?"
 - "How many BGP neighbors does the Linx route server have?"
+- "Who owns AS15169?"
 - "Compare routes to 1.1.1.1 across different regions"
 
 ## Features
 
 - **Query live BGP routes** from 7 globally-distributed public route servers
+- **Look up ASN ownership** using BGPKit public API
 - **Retrieve BGP summary statistics** including router ID, AS number, neighbor count
 - **IPv4 and IPv6 support** - works with both address families
 - **CIDR notation support** - look up entire subnets
@@ -117,6 +119,32 @@ Display all configured BGP looking-glass servers.
 list_servers()
 ```
 
+---
+
+### `asn_owner` - Look Up ASN Owner
+
+Retrieve the owner name for an Autonomous System Number (ASN) using BGPKit API.
+
+**Parameters:**
+
+- `asn` - Autonomous System Number in format "AS123" or "123" (e.g., "AS15169", "64512")
+
+**Returns:** Owner name for the ASN.
+
+**Example:**
+
+```python
+asn_owner(asn="AS15169")
+asn_owner(asn="15169")
+asn_owner(asn="AS64512")
+```
+
+**Use cases:**
+
+- Identify who operates a particular AS
+- Verify AS ownership when analyzing routing information
+- Understand the entities involved in a BGP path
+
 ## Supported Route Servers
 
 7 globally-distributed public RouteViews servers, all freely accessible:
@@ -212,10 +240,10 @@ All communication uses simple on-demand telnet connections - no persistent sessi
 
 The server consists of:
 
-- **server.py** - Main MCP server with all tools, command execution, and IP validation
-- **bgp_client.py** - Telnet client for BGP router connections
+- **server.py** - Main MCP server with all tools
+- **bgp_lg.py** - Library with worker functions (telnet client, IP validation, ASN lookup, config management)
 - **config.json** - Configuration for available route servers
-- **requirements.txt** - Python dependencies
+- **pyproject.toml** - Python dependencies
 
 ## Examples
 
@@ -226,6 +254,15 @@ User: Is 203.0.113.0/24 currently routed to the internet?
 Claude: route_lookup(destination="203.0.113.0/24")
 Result: [Shows all routes matching that prefix from the route server]
 Claude: Based on the BGP data, this subnet is being announced by AS65001 with these paths...
+```
+
+### Look up an ASN owner
+
+```text
+User: Who operates AS15169?
+Claude: asn_owner(asn="AS15169")
+Result: Google LLC
+Claude: AS15169 is operated by Google LLC, which owns several large networks...
 ```
 
 ### Compare routing across regions

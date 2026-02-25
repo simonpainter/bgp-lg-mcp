@@ -11,6 +11,7 @@ from bgp_lg import (
     load_config,
     get_available_servers,
     execute_bgp_command,
+    lookup_asn_owner,
 )
 
 
@@ -101,6 +102,29 @@ def list_servers() -> str:
         return output
     except Exception as e:
         return f"Error listing servers: {str(e)}"
+
+
+@mcp.tool()
+async def asn_owner(asn: str) -> str:
+    """Look up the owner name for an Autonomous System Number (ASN).
+
+    Uses the BGPKit public API to retrieve ASN ownership information.
+
+    Args:
+        asn: Autonomous System Number in format "AS123" or "123" (e.g., "AS64512" or "64512").
+
+    Returns:
+        Owner name for the ASN.
+    """
+    try:
+        owner_name = await lookup_asn_owner(asn)
+        return f"ASN {asn}: {owner_name}"
+    except ValueError as e:
+        return f"Invalid ASN: {str(e)}"
+    except RuntimeError as e:
+        return f"Lookup error: {str(e)}"
+    except Exception as e:
+        return f"Unexpected error: {type(e).__name__}: {str(e)}"
 
 
 # Create ASGI application for production deployment

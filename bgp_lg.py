@@ -4,8 +4,11 @@ import asyncio
 import ipaddress
 import json
 import os
+import re
 from pathlib import Path
 from typing import Optional
+
+import httpx
 
 # Telnet protocol constants
 TELNET_IAC = 0xff  # Interpret As Command
@@ -481,3 +484,88 @@ async def execute_bgp_command(server_name: str, command: str) -> str:
         
     except Exception as e:
         raise RuntimeError(f"Failed to query {server_name}: {str(e)}")
+
+
+def _parse_asn(asn_input: str) -> int:
+    """Parse ASN from various formats (AS123 or 123).
+    
+    Args:
+        asn_input: ASN as string in format "AS123" or "123"
+        
+    Returns:
+        ASN as integer
+        
+    Raises:
+        ValueError: If ASN format is invalid or out of range
+    """
+    asn_input = asn_input.strip().upper()
+    
+    # Remove "AS" prefix if present
+    if asn_input.startswith("AS"):
+        asn_input = asn_input[2:]
+    
+    try:
+        asn = int(asn_input)
+    except ValueError:
+        raise ValueError(f"Invalid ASN format: must be a number, optionally prefixed with 'AS'")
+    
+    # Validate ASN range (0-4294967295 for 32-bit ASN)
+    if asn < 0 or asn > 4294967295:
+        raise ValueError(f"ASN {asn} out of valid range (0-4294967295)")
+    
+    return asn
+
+
+async def lookup_asn_owner(asn_input: str, timeout: int = 10) -> str:
+    """Look up ASN owner name using BGPKit API.
+    
+    Args:
+        asn_input: ASN as string in format "AS123" or "123"
+        timeout: Request timeout in seconds
+        
+    Returns:
+        Owner name for the ASN
+        
+    Raises:
+        ValueError: If ASN format is invalid
+        RuntimeError: If API request fails
+    """
+    # Validate and parse ASN
+    try:
+        asn = _parse_asn(asn_input)
+    except ValueError as e:
+        raise ValueError(f"Invalid ASN: {str(e)}")
+    
+    # Call BGPKit API
+    api_url = f"https://api.bgpkit.com/v3/utils/asn/{asn}"
+    
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.get(api_url)
+            
+            if response.status_code == 404:
+                raise RuntimeError(f"ASN {asn} not found in BGPKit database")
+            
+            if response.status_code == 429:
+                raise RuntimeError("BGPKit API rate limit exceeded, please try again later")
+            
+            if response.status_code >= 500:
+                raise RuntimeError(f"BGPKit API server error (status {response.status_code})")
+            
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            # Extract owner name from response
+            owner_name = data.get("data", {}).get("owner_name")
+            if not owner_name:
+                raise RuntimeError(f"No owner name found for ASN {asn}")
+            
+            return owner_name
+            
+    except httpx.TimeoutException:
+        raise RuntimeError(f"BGPKit API request timed out after {timeout}s")
+    except httpx.RequestError as e:
+        raise RuntimeError(f"BGPKit API request failed: {str(e)}")
+    except json.JSONDecodeError:
+        raise RuntimeError("BGPKit API returned invalid JSON")
