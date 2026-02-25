@@ -49,21 +49,23 @@ class TestLookupASNOwner:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            "data": {
-                "owner_name": "Google LLC"
-            }
+            "data": [
+                {
+                    "name": "GOOGLE - Google LLC"
+                }
+            ]
         }
 
         with patch("bgp_lg.httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
-            mock_client.post.return_value = mock_response
+            mock_client.get.return_value = mock_response
             mock_client.__aenter__.return_value = mock_client
             mock_client.__aexit__.return_value = None
             mock_client_class.return_value = mock_client
 
             result = await lookup_asn_owner("AS15169")
-            assert result == "Google LLC"
-            mock_client.post.assert_called_once_with(
+            assert result == "GOOGLE - Google LLC"
+            mock_client.get.assert_called_once_with(
                 "https://api.bgpkit.com/v3/utils/asn",
                 params={"asn": 15169}
             )
@@ -76,7 +78,7 @@ class TestLookupASNOwner:
 
         with patch("bgp_lg.httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
-            mock_client.post.return_value = mock_response
+            mock_client.get.return_value = mock_response
             mock_client.__aenter__.return_value = mock_client
             mock_client.__aexit__.return_value = None
             mock_client_class.return_value = mock_client
@@ -92,7 +94,7 @@ class TestLookupASNOwner:
 
         with patch("bgp_lg.httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
-            mock_client.post.return_value = mock_response
+            mock_client.get.return_value = mock_response
             mock_client.__aenter__.return_value = mock_client
             mock_client.__aexit__.return_value = None
             mock_client_class.return_value = mock_client
@@ -108,7 +110,7 @@ class TestLookupASNOwner:
 
         with patch("bgp_lg.httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
-            mock_client.post.return_value = mock_response
+            mock_client.get.return_value = mock_response
             mock_client.__aenter__.return_value = mock_client
             mock_client.__aexit__.return_value = None
             mock_client_class.return_value = mock_client
@@ -123,7 +125,7 @@ class TestLookupASNOwner:
 
         with patch("bgp_lg.httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
-            mock_client.post.side_effect = httpx.TimeoutException("timeout")
+            mock_client.get.side_effect = httpx.TimeoutException("timeout")
             mock_client.__aenter__.return_value = mock_client
             mock_client.__aexit__.return_value = None
             mock_client_class.return_value = mock_client
