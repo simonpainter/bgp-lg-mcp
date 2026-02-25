@@ -1,0 +1,202 @@
+[
+  {
+    "hostname": "route-server.belwue.de",
+    "login": null,
+    "connectivity": false,
+    "ping_supported": false,
+    "traceroute_supported": false,
+    "connectivity_error": "Server 'route-server.belwue.de' not found in configuration",
+    "ping_error": null,
+    "traceroute_error": null
+  },
+  {
+    "hostname": "route-server.belwue.de",
+    "login": "rviews",
+    "connectivity": false,
+    "ping_supported": false,
+    "traceroute_supported": false,
+    "connectivity_error": "Server 'route-server.belwue.de' not found in configuration",
+    "ping_error": null,
+    "traceroute_error": null
+  },
+  {
+    "hostname": "route-views.on.bb.telus.com",
+    "login": null,
+    "connectivity": false,
+    "ping_supported": false,
+    "traceroute_supported": false,
+    "connectivity_error": "Server 'route-views.on.bb.telus.com' not found in configuration",
+    "ping_error": null,
+    "traceroute_error": null
+  },
+  {
+    "hostname": "route-views.on.ab.telus.com",
+    "login": null,
+    "connectivity": false,
+    "ping_supported": false,
+    "traceroute_supported": false,
+    "connectivity_error": "Server 'route-views.on.ab.telus.com' not found in configuration",
+    "ping_error": null,
+    "traceroute_error": null
+  },
+  {
+    "hostname": "route-views.isc.routeviews.org",
+    "login": null,
+    "connectivity": false,
+    "ping_supported": false,
+    "traceroute_supported": false,
+    "connectivity_error": "Server 'route-views.isc.routeviews.org' not found in configuration",
+    "ping_error": null,
+    "traceroute_error": null
+  },
+  {
+    "hostname": "lg.rsix.tche.br",
+    "login": null,
+    "connectivity": false,
+    "ping_supported": false,
+    "traceroute_supported": false,
+    "connectivity_error": "Server 'lg.rsix.tche.br' not found in configuration",
+    "ping_error": null,
+    "traceroute_error": null
+  },
+  {
+    "hostname": "route-views.wide.routeviews.org",
+    "login": null,
+    "connectivity": false,
+    "ping_supported": false,
+    "traceroute_supported": false,
+    "connectivity_error": "Server 'route-views.wide.routeviews.org' not found in configuration",
+    "ping_error": null,
+    "traceroute_error": null
+  },
+  {
+    "hostname": "route-server.as3257.net",
+    "login": "public",
+    "connectivity": false,
+    "ping_supported": false,
+    "traceroute_supported": false,
+    "connectivity_error": "Server 'route-server.as3257.net' not found in configuration",
+    "ping_error": null,
+    "traceroute_error": null
+  },
+  {
+    "hostname": "route-server.ip.tdc.net",
+    "login": "rviews",
+    "connectivity": false,
+    "ping_supported": false,
+    "traceroute_supported": false,
+    "connectivity_error": "Server 'route-server.ip.tdc.net' not found in configuration",
+    "ping_error": null,
+    "traceroute_error": null
+  },
+  {
+    "hostname": "route-server.ip-plus.net",
+    "login": null,
+    "connectivity": false,
+    "ping_supported": false,
+    "traceroute_supported": false,
+    "connectivity_error": "Server 'route-server.ip-plus.net' not found in configuration",
+    "ping_error": null,
+    "traceroute_error": null
+  },
+  {
+    "hostname": "route-server.gblx.net",
+    "login": null,
+    "connectivity": false,
+    "ping_supported": false,
+    "traceroute_supported": false,
+    "connectivity_error": "Server 'route-server.gblx.net' not found in configuration",
+    "ping_error": null,
+    "traceroute_error": null
+  },
+  {
+    "hostname": "route-server.eu.gblx.net",
+    "login": null,
+    "connectivity": false,
+    "ping_supported": false,
+    "traceroute_supported": false,
+    "connectivity_error": "Server 'route-server.eu.gblx.net' not found in configuration",
+    "ping_error": null,
+    "traceroute_error": null
+  },
+  {
+    "hostname": "route-views.routeviews.org",
+    "login": "rviews",
+    "connectivity": false,
+    "ping_supported": false,
+    "traceroute_supported": false,
+    "connectivity_error": "Server 'route-views.routeviews.org' not found in configuration",
+    "ping_error": null,
+    "traceroute_error": null
+  },
+  {
+    "hostname": "route-views3.routeviews.org",
+    "login": null,
+    "connectivity": false,
+    "ping_supported": false,
+    "traceroute_supported": false,
+    "connectivity_error": "Server 'route-views3.routeviews.org' not found in configuration",
+    "ping_error": null,
+    "traceroute_error": null
+  },
+  {
+    "hostname": "route-views4.routeviews.org",
+    "login": null,
+    "connectivity": false,
+    "ping_supported": false,
+    "traceroute_supported": false,
+    "connectivity_error": "Server 'route-views4.routeviews.org' not found in configuration",
+    "ping_error": null,
+    "traceroute_error": null
+  },
+  {
+    "hostname": "route-views6.routeviews.org",
+    "login": null,
+    "connectivity": false,
+    "ping_supported": false,
+    "traceroute_supported": false,
+    "connectivity_error": "Server 'route-views6.routeviews.org' not found in configuration",
+    "ping_error": null,
+    "traceroute_error": null
+  },
+  {
+    "hostname": "public-route-server.is.co.za/",
+    "login": null,
+    "connectivity": false,
+    "ping_supported": false,
+    "traceroute_supported": false,
+    "connectivity_error": "Server 'public-route-server.is.co.za/' not found in configuration",
+    "ping_error": null,
+    "traceroute_error": null
+  },
+  {
+    "hostname": "rv0.telon.uk.easynet.net",
+    "login": "public",
+    "connectivity": false,
+    "ping_supported": false,
+    "traceroute_supported": false,
+    "connectivity_error": "Server 'rv0.telon.uk.easynet.net' not found in configuration",
+    "ping_error": null,
+    "traceroute_error": null
+  },
+  {
+    "hostname": "route-views.sydney.routeviews.org",
+    "login": null,
+    "connectivity": false,
+    "ping_supported": false,
+    "traceroute_supported": false,
+    "connectivity_error": "Server 'route-views.sydney.routeviews.org' not found in configuration",
+    "ping_error": null,
+    "traceroute_error": null
+  },
+  {
+    "hostname": "route-server.as5413.net",
+    "login": null,
+    "connectivity": false,
+    "ping_supported": false,
+    "traceroute_supported": false,
+    "connectivity_error": "Server 'route-server.as5413.net' not found in configuration",
+    "ping_error": null,
+    "traceroute_error": null
+  }
+]
