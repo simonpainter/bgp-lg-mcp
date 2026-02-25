@@ -306,6 +306,15 @@ Claude: Yes, the Linx route server is operating normally with X neighbors...
 - Python 3.7+
 - Dependencies listed in `requirements.txt` (FastAPI, uvicorn, mcp)
 
+## Development
+
+Install the package with dev dependencies and run the test suite:
+
+```bash
+pip install -e ".[dev]"
+pytest
+```
+
 ## Limitations
 
 - **Telnet only** - Currently only supports telnet connections (RFC 854 compatible)
