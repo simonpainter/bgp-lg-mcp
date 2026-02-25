@@ -808,3 +808,141 @@ async def lookup_ip_geolocation(ip_input: str, timeout: int = 10) -> dict:
         raise RuntimeError("BGPKit API returned invalid JSON")
 
 
+def _parse_ping_output(output: str) -> dict:
+    """Parse ping command output and extract statistics.
+    
+    Expected format:
+    Success rate is 100 percent (5/5), round-trip min/avg/max = 4/4/4 ms
+    
+    Args:
+        output: Raw output from ping command
+        
+    Returns:
+        Dictionary with keys: success_rate, sent, received, min_ms, avg_ms, max_ms
+    """
+    result = {
+        "success_rate": 0,
+        "sent": 0,
+        "received": 0,
+        "min_ms": None,
+        "avg_ms": None,
+        "max_ms": None,
+    }
+    
+    # Extract success rate and packet counts
+    # Format: "Success rate is 100 percent (5/5), ..."
+    success_match = re.search(r"Success rate is (\d+) percent \((\d+)/(\d+)\)", output)
+    if success_match:
+        result["success_rate"] = int(success_match.group(1))
+        result["received"] = int(success_match.group(2))
+        result["sent"] = int(success_match.group(3))
+    
+    # Extract round-trip times
+    # Format: "round-trip min/avg/max = 4/4/4 ms"
+    rtt_match = re.search(r"round-trip min/avg/max = ([\d.]+)/([\d.]+)/([\d.]+) ms", output)
+    if rtt_match:
+        result["min_ms"] = float(rtt_match.group(1))
+        result["avg_ms"] = float(rtt_match.group(2))
+        result["max_ms"] = float(rtt_match.group(3))
+    
+    return result
+
+
+def _parse_traceroute_output(output: str, target_ip: str) -> dict:
+    """Parse traceroute command output and extract hop information.
+    
+    Expected format:
+    Tracing the route to one.one.one.one (1.1.1.1)
+      1 vl-51-gw.uoregon.edu (128.223.51.1) [AS 3582] 8 msec 8 msec 9 msec
+      2 10.252.19.140 7 msec 7 msec 12 msec
+      ...
+     11  * * 
+        one.one.one.one (1.1.1.1) [AS 13335] 7 msec
+    
+    Args:
+        output: Raw output from traceroute command
+        target_ip: Target IP address we're tracing to
+        
+    Returns:
+        Dictionary with keys: target_hostname, total_hops, hops (list of hop dicts)
+    """
+    result = {
+        "target_hostname": None,
+        "total_hops": 0,
+        "hops": [],
+    }
+    
+    lines = output.split("\n")
+    
+    # Extract target hostname from first line
+    # Format: "Tracing the route to hostname (IP)"
+    first_line_match = re.search(r"Tracing the route to ([\w.-]+) \([\d.]+\)", output)
+    if first_line_match:
+        result["target_hostname"] = first_line_match.group(1)
+    
+    current_hop = None
+    
+    for line in lines:
+        # Skip empty lines and header
+        if not line.strip() or "Tracing" in line:
+            continue
+        
+        # Check if line starts with a hop number
+        hop_match = re.match(r"^\s*(\d+)\s+", line)
+        if hop_match:
+            # If we have a previous hop, save it
+            if current_hop is not None:
+                result["hops"].append(current_hop)
+            
+            hop_number = int(hop_match.group(1))
+            current_hop = {
+                "hop_number": hop_number,
+                "host": None,
+                "ip": None,
+                "asn": None,
+                "times_ms": [],
+                "rtt_avg_ms": None,
+            }
+            
+            # Extract hostname and IP
+            # Format: "hostname (IP) [AS ASN] times"
+            host_match = re.search(r"([\w.-]+)\s+\(([\d.]+)\)(?:\s+\[AS\s+(\d+)\])?", line)
+            if host_match:
+                current_hop["host"] = host_match.group(1)
+                current_hop["ip"] = host_match.group(2)
+                if host_match.group(3):
+                    current_hop["asn"] = int(host_match.group(3))
+            else:
+                # Line might be IP only without hostname
+                # Look for IP after the hop number (skip the hop number itself)
+                remaining_line = line[hop_match.end():]  # Get everything after the hop number
+                ip_match = re.search(r"([\d.]+)", remaining_line)
+                if ip_match and remaining_line.strip() and not remaining_line.strip().startswith("*"):
+                    current_hop["ip"] = ip_match.group(1)
+            
+            # Extract all times in milliseconds
+            time_matches = re.findall(r"([\d.]+)\s+ms", line)
+            if time_matches:
+                current_hop["times_ms"] = [float(t) for t in time_matches]
+                # Calculate average RTT
+                if current_hop["times_ms"]:
+                    current_hop["rtt_avg_ms"] = sum(current_hop["times_ms"]) / len(current_hop["times_ms"])
+            
+            # Check for timeout markers (* * *)
+            # This means the line is like "2  * * *"
+            remaining_after_hop = line[hop_match.end():]
+            if "*" in remaining_after_hop and re.match(r"^\s*\*[\s\*]*$", remaining_after_hop):
+                current_hop["host"] = "*"
+                current_hop["ip"] = None
+    
+    # Don't forget the last hop
+    if current_hop is not None:
+        result["hops"].append(current_hop)
+
+    
+    result["total_hops"] = len(result["hops"])
+    
+    return result
+
+
+

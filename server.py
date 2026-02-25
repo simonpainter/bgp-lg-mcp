@@ -16,6 +16,8 @@ from bgp_lg import (
     lookup_ip_geolocation,
     _parse_bgp_route_lookup,
     _parse_bgp_summary,
+    _parse_ping_output,
+    _parse_traceroute_output,
 )
 from models import (
     ErrorResponse,
@@ -25,6 +27,10 @@ from models import (
     IPLookupResponse,
     ListServersResponse,
     ServerInfo,
+    PingResponse,
+    PingStats,
+    TracerouteResponse,
+    TracerouteHop,
 )
 
 
@@ -266,6 +272,209 @@ async def ip_lookup(ip: str, format: str = "text") -> str:
         if format.lower() == "json":
             return error.model_dump_json(indent=2)
         return f"Lookup error: {str(e)}"
+    except Exception as e:
+        error = ErrorResponse(error=f"Unexpected error: {type(e).__name__}: {str(e)}")
+        if format.lower() == "json":
+            return error.model_dump_json(indent=2)
+        return f"Unexpected error: {type(e).__name__}: {str(e)}"
+
+
+@mcp.tool()
+async def ping_host(ip: str, server: str = "RouteViews Linx", format: str = "text") -> str:
+    """Ping an IP address from a BGP looking-glass server.
+
+    Args:
+        ip: IPv4 or IPv6 address to ping.
+        server: Name of the BGP server to use for pinging (defaults to RouteViews Linx).
+                Call list_servers() to see all available servers.
+        format: Response format - "text" (default) or "json" for structured output.
+
+    Returns:
+        Ping statistics including success rate, packet counts, and round-trip times.
+    """
+    # Validate IP
+    is_valid, message = validate_ip_or_cidr(ip)
+    if not is_valid:
+        error = ErrorResponse(error=message)
+        if format.lower() == "json":
+            return error.model_dump_json(indent=2)
+        return f"Error: {message}"
+
+    try:
+        # Get config to check server capabilities
+        config = load_config()
+        servers_info = config.get("servers", {})
+        
+        if server not in servers_info:
+            raise ValueError(f"Server '{server}' not found. Call list_servers() to see available servers.")
+        
+        server_info = servers_info[server]
+        if not server_info.get("supports_ping", False):
+            raise ValueError(f"Server '{server}' does not support ping command.")
+        
+        # Execute ping command
+        command = f"ping {ip}"
+        response = await execute_bgp_command(server, command)
+        
+        # Parse ping output
+        ping_stats = _parse_ping_output(response)
+        
+        # Return JSON format if requested
+        if format.lower() == "json":
+            ping_stats_obj = PingStats(
+                sent=ping_stats["sent"],
+                received=ping_stats["received"],
+                success_rate=ping_stats["success_rate"],
+                min_ms=ping_stats["min_ms"],
+                avg_ms=ping_stats["avg_ms"],
+                max_ms=ping_stats["max_ms"],
+            )
+            ping_response = PingResponse(
+                type="ping",
+                ip=ip,
+                server=server,
+                stats=ping_stats_obj,
+                raw_output=response,
+            )
+            return ping_response.model_dump_json(indent=2)
+        
+        # Format response as text
+        output = f"Ping Results for {ip}\n"
+        output += f"Server: {server}\n"
+        output += f"Packets sent: {ping_stats['sent']}\n"
+        output += f"Packets received: {ping_stats['received']}\n"
+        output += f"Success rate: {ping_stats['success_rate']}%\n"
+        if ping_stats["min_ms"] is not None:
+            output += f"Round-trip times (ms): min={ping_stats['min_ms']}, avg={ping_stats['avg_ms']}, max={ping_stats['max_ms']}"
+        
+        return output
+    except ValueError as e:
+        error = ErrorResponse(error=str(e))
+        if format.lower() == "json":
+            return error.model_dump_json(indent=2)
+        return f"Error: {str(e)}"
+    except ConnectionError as e:
+        error_msg = f"Connection error: {str(e)} - The BGP server may be unreachable or not accepting connections"
+        error = ErrorResponse(error=error_msg)
+        if format.lower() == "json":
+            return error.model_dump_json(indent=2)
+        return error_msg
+    except RuntimeError as e:
+        error = ErrorResponse(error=f"Ping error: {str(e)}")
+        if format.lower() == "json":
+            return error.model_dump_json(indent=2)
+        return f"Ping error: {str(e)}"
+    except Exception as e:
+        error = ErrorResponse(error=f"Unexpected error: {type(e).__name__}: {str(e)}")
+        if format.lower() == "json":
+            return error.model_dump_json(indent=2)
+        return f"Unexpected error: {type(e).__name__}: {str(e)}"
+
+
+@mcp.tool()
+async def traceroute_host(ip: str, server: str = "RouteViews Linx", format: str = "text") -> str:
+    """Trace the route to an IP address from a BGP looking-glass server.
+
+    Args:
+        ip: IPv4 or IPv6 address to trace route to.
+        server: Name of the BGP server to use for traceroute (defaults to RouteViews Linx).
+                Call list_servers() to see all available servers.
+        format: Response format - "text" (default) or "json" for structured output.
+
+    Returns:
+        Traceroute results showing hops, hostnames, IPs, ASNs, and response times.
+    """
+    # Validate IP
+    is_valid, message = validate_ip_or_cidr(ip)
+    if not is_valid:
+        error = ErrorResponse(error=message)
+        if format.lower() == "json":
+            return error.model_dump_json(indent=2)
+        return f"Error: {message}"
+
+    try:
+        # Get config to check server capabilities
+        config = load_config()
+        servers_info = config.get("servers", {})
+        
+        if server not in servers_info:
+            raise ValueError(f"Server '{server}' not found. Call list_servers() to see available servers.")
+        
+        server_info = servers_info[server]
+        if not server_info.get("supports_traceroute", False):
+            raise ValueError(f"Server '{server}' does not support traceroute command.")
+        
+        # Execute traceroute command
+        command = f"traceroute {ip}"
+        response = await execute_bgp_command(server, command)
+        
+        # Parse traceroute output
+        traceroute_data = _parse_traceroute_output(response, ip)
+        
+        # Return JSON format if requested
+        if format.lower() == "json":
+            hops = [
+                TracerouteHop(
+                    hop_number=hop["hop_number"],
+                    host=hop["host"],
+                    ip=hop["ip"],
+                    asn=hop["asn"],
+                    times_ms=hop["times_ms"],
+                    rtt_avg_ms=hop["rtt_avg_ms"],
+                )
+                for hop in traceroute_data["hops"]
+            ]
+            traceroute_response = TracerouteResponse(
+                type="traceroute",
+                ip=ip,
+                target_hostname=traceroute_data["target_hostname"],
+                server=server,
+                total_hops=traceroute_data["total_hops"],
+                hops=hops,
+                raw_output=response,
+            )
+            return traceroute_response.model_dump_json(indent=2)
+        
+        # Format response as text
+        output = f"Traceroute to {ip}\n"
+        output += f"Server: {server}\n"
+        if traceroute_data["target_hostname"]:
+            output += f"Target hostname: {traceroute_data['target_hostname']}\n"
+        output += f"Total hops: {traceroute_data['total_hops']}\n\n"
+        
+        for hop in traceroute_data["hops"]:
+            output += f"{hop['hop_number']:2d}. "
+            if hop["host"] == "*":
+                output += "* (no response)"
+            else:
+                if hop["host"]:
+                    output += f"{hop['host']}"
+                if hop["ip"]:
+                    output += f" ({hop['ip']})"
+                if hop["asn"]:
+                    output += f" [AS {hop['asn']}]"
+                if hop["times_ms"]:
+                    times_str = " ".join([f"{t:.1f}" for t in hop["times_ms"]])
+                    output += f" {times_str} ms"
+            output += "\n"
+        
+        return output
+    except ValueError as e:
+        error = ErrorResponse(error=str(e))
+        if format.lower() == "json":
+            return error.model_dump_json(indent=2)
+        return f"Error: {str(e)}"
+    except ConnectionError as e:
+        error_msg = f"Connection error: {str(e)} - The BGP server may be unreachable or not accepting connections"
+        error = ErrorResponse(error=error_msg)
+        if format.lower() == "json":
+            return error.model_dump_json(indent=2)
+        return error_msg
+    except RuntimeError as e:
+        error = ErrorResponse(error=f"Traceroute error: {str(e)}")
+        if format.lower() == "json":
+            return error.model_dump_json(indent=2)
+        return f"Traceroute error: {str(e)}"
     except Exception as e:
         error = ErrorResponse(error=f"Unexpected error: {type(e).__name__}: {str(e)}")
         if format.lower() == "json":

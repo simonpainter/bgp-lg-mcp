@@ -1,25 +1,29 @@
 # BGP Looking Glass MCP Server
 
-Query live BGP routing information from public route servers via Claude Desktop or any MCP client.
+Query live BGP routing information, ping IP addresses, and trace network paths from public route servers via Claude Desktop or any MCP client.
 
 ## What Is This?
 
 A **BGP Looking Glass** is an internet-accessible service that exposes BGP (Border Gateway Protocol) routing data. BGP is the protocol that powers the internet's routing infrastructure. Looking glasses let you see what routes a particular BGP speaker has learned and how it would route traffic to a given destination.
 
-This project wraps 7 public RouteViews servers into an **MCP (Model Context Protocol) server**, making BGP queries available to Claude Desktop and other AI assistants. Now you can ask Claude about internet routing with live, authoritative data.
+This project wraps 7 public RouteViews servers into an **MCP (Model Context Protocol) server**, making BGP queries, ping, and traceroute available to Claude Desktop and other AI assistants. Now you can ask Claude about internet routing with live, authoritative data.
 
 **Example questions Claude can answer:**
 
-- "What's the AS path to 8.8.8.0/24?"
+- "What's the AS path to 8.8.0/24?"
 - "Is this prefix routed?"
 - "How many BGP neighbors does the Linx route server have?"
 - "Who owns AS15169?"
 - "Which country is IP 1.1.1.1 located in?"
+- "Can you ping 8.8.8.8 from different servers and compare latencies?"
+- "Show me the network path to Google DNS"
 - "Compare routes to 1.1.1.1 across different regions"
 
 ## Features
 
 - **Query live BGP routes** from 7 globally-distributed public route servers
+- **Ping IP addresses** from route servers to test connectivity and measure latency
+- **Trace routes** to IP addresses to see the network path and identify which ASes are involved
 - **Look up IP geolocation & BGP metadata** using BGPKit public API
 - **Look up ASN ownership** using BGPKit public API
 - **Retrieve BGP summary statistics** including router ID, AS number, neighbor count
@@ -272,6 +276,185 @@ Updated: 2026-02-25T10:00:00
 - Verify RPKI signing status of announced prefixes
 - Map traffic sources to organizations
 - Verify prefix ownership
+
+---
+
+### `ping_host` - Ping an IP Address
+
+Ping an IP address from a BGP looking-glass server to test connectivity and measure round-trip time.
+
+**Parameters:**
+
+- `ip` - IPv4 or IPv6 address to ping (e.g., `8.8.8.8`, `1.1.1.1`)
+- `server` - Which route server to use for pinging (default: RouteViews Linx)
+- `format` - Response format: `text` (default) or `json`
+
+**Returns:** Ping statistics including:
+
+- **Success rate** - Percentage of successful pings (0-100%)
+- **Packets sent/received** - Total packets and successfully returned packets
+- **Round-trip times** - Minimum, average, and maximum latency in milliseconds
+
+**Example:**
+
+```python
+ping_host(ip="8.8.8.8")
+ping_host(ip="1.1.1.1", server="RouteViews Main")
+ping_host(ip="2001:4860:4860::8888", format="json")
+```
+
+**Text Output Example:**
+
+```
+Ping Results for 8.8.8.8
+Server: RouteViews Linx
+Packets sent: 5
+Packets received: 5
+Success rate: 100%
+Round-trip times (ms): min=10.5, avg=11.2, max=12.3
+```
+
+**JSON Output Example:**
+
+```json
+{
+  "type": "ping",
+  "ip": "8.8.8.8",
+  "server": "RouteViews Linx",
+  "stats": {
+    "sent": 5,
+    "received": 5,
+    "success_rate": 100,
+    "min_ms": 10.5,
+    "avg_ms": 11.2,
+    "max_ms": 12.3
+  },
+  "raw_output": "Success rate is 100 percent (5/5), round-trip min/avg/max = 10.5/11.2/12.3 ms"
+}
+```
+
+**Supported Servers:**
+
+- RouteViews Linx ✅
+- RouteViews Main ✅
+- RouteViews 2 ✅
+- Other servers ❌ (limited access)
+
+**Use cases:**
+
+- Test connectivity to a remote IP address
+- Measure latency from different geographic locations
+- Verify if an IP address is reachable
+- Diagnose network issues by comparing latency
+- Monitor round-trip times over time
+
+---
+
+### `traceroute_host` - Trace Route to an IP Address
+
+Trace the network path (hops) to an IP address from a BGP looking-glass server.
+
+**Parameters:**
+
+- `ip` - IPv4 or IPv6 address to trace (e.g., `8.8.8.8`, `1.1.1.1`)
+- `server` - Which route server to use for tracing (default: RouteViews Linx)
+- `format` - Response format: `text` (default) or `json`
+
+**Returns:** Traceroute results including:
+
+- **Hop number** - Sequential hop from source to destination
+- **Hostname** - DNS name of the hop (if available)
+- **IP address** - IP address of the hop
+- **AS number** - Autonomous System number of the hop
+- **Response times** - Round-trip time for each probe (typically 3 probes per hop)
+
+**Example:**
+
+```python
+traceroute_host(ip="8.8.8.8")
+traceroute_host(ip="1.1.1.1", server="RouteViews Sydney")
+traceroute_host(ip="2001:4860:4860::8888", format="json")
+```
+
+**Text Output Example:**
+
+```
+Traceroute to 8.8.8.8
+Server: RouteViews Linx
+Target hostname: dns.google
+Total hops: 12
+
+ 1. gw.example.com (10.0.0.1) 1.2 1.1 1.3 ms
+ 2. isp-gateway.net (203.0.113.1) [AS 64500] 5.2 5.1 5.3 ms
+ 3. * (no response)
+ 4. core-router.example.net (203.0.114.1) [AS 65001] 10.5 10.2 10.8 ms
+ ...
+12. dns.google (8.8.8.8) [AS 15169] 25.3 25.1 25.5 ms
+```
+
+**JSON Output Example:**
+
+```json
+{
+  "type": "traceroute",
+  "ip": "8.8.8.8",
+  "target_hostname": "dns.google",
+  "server": "RouteViews Linx",
+  "total_hops": 12,
+  "hops": [
+    {
+      "hop_number": 1,
+      "host": "gw.example.com",
+      "ip": "10.0.0.1",
+      "asn": null,
+      "times_ms": [1.2, 1.1, 1.3],
+      "rtt_avg_ms": 1.2
+    },
+    {
+      "hop_number": 2,
+      "host": "isp-gateway.net",
+      "ip": "203.0.113.1",
+      "asn": 64500,
+      "times_ms": [5.2, 5.1, 5.3],
+      "rtt_avg_ms": 5.2
+    },
+    {
+      "hop_number": 3,
+      "host": "*",
+      "ip": null,
+      "asn": null,
+      "times_ms": [],
+      "rtt_avg_ms": null
+    }
+  ],
+  "raw_output": "..."
+}
+```
+
+**Supported Servers:**
+
+- RouteViews Linx ✅
+- RouteViews Main ✅
+- RouteViews 2 ✅
+- Other servers ❌ (limited access)
+
+**Understanding Traceroute Output:**
+
+- **Hops with times** - Successfully responded with latency data
+- **Hops with \*** - The router didn't respond to traceroute probes (sometimes routers block ICMP/UDP)
+- **AS numbers** - Show which Autonomous Systems (networks) are involved in the path
+- **Increasing latency** - Each hop should have higher latency as you get further from the source
+
+**Use cases:**
+
+- Identify the network path between two points on the internet
+- Diagnose where network problems occur (which hop fails)
+- Understand which ASes are involved in routing traffic
+- Verify direct peering relationships between networks
+- Map network topology and interconnections
+- Debug latency issues by identifying slow hops
+
+---
 
 ## Supported Route Servers
 

@@ -72,3 +72,43 @@ class ListServersResponse(BaseModel):
     """Response model for list_servers tool."""
     type: str = "server_list"
     servers: List[ServerInfo]
+
+
+class PingStats(BaseModel):
+    """Ping statistics."""
+    sent: int
+    received: int
+    success_rate: float = Field(..., description="Success rate as percentage (0-100)")
+    min_ms: Optional[float] = None
+    avg_ms: Optional[float] = None
+    max_ms: Optional[float] = None
+
+
+class PingResponse(BaseModel):
+    """Response model for ping tool."""
+    type: str = "ping"
+    ip: str
+    server: str
+    stats: PingStats
+    raw_output: str
+
+
+class TracerouteHop(BaseModel):
+    """Represents a single hop in traceroute."""
+    hop_number: int
+    host: Optional[str] = None
+    ip: Optional[str] = None
+    asn: Optional[int] = None
+    times_ms: List[float] = Field(default_factory=list, description="Round-trip times in milliseconds")
+    rtt_avg_ms: Optional[float] = None
+
+
+class TracerouteResponse(BaseModel):
+    """Response model for traceroute tool."""
+    type: str = "traceroute"
+    ip: str
+    target_hostname: Optional[str] = None
+    server: str
+    total_hops: int
+    hops: List[TracerouteHop] = Field(default_factory=list)
+    raw_output: str

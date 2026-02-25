@@ -9,7 +9,9 @@
       "password": "",
       "prompt": ">",
       "timeout": 15,
-      "enabled": true
+      "enabled": true,
+      "supports_ping": true,
+      "supports_traceroute": true
     },
     {
       "name": "RouteViews Main",
@@ -20,7 +22,9 @@
       "password": "rviews",
       "prompt": ">",
       "timeout": 15,
-      "enabled": true
+      "enabled": true,
+      "supports_ping": true,
+      "supports_traceroute": true
     },
     {
       "name": "RouteViews2",
@@ -31,7 +35,9 @@
       "password": "",
       "prompt": ">",
       "timeout": 15,
-      "enabled": true
+      "enabled": true,
+      "supports_ping": true,
+      "supports_traceroute": true
     },
     {
       "name": "Equinix Ashburn",
@@ -42,7 +48,9 @@
       "password": "",
       "prompt": ">",
       "timeout": 15,
-      "enabled": true
+      "enabled": true,
+      "supports_ping": false,
+      "supports_traceroute": false
     },
     {
       "name": "DE-CIX New York",
@@ -53,7 +61,9 @@
       "password": "",
       "prompt": ">",
       "timeout": 15,
-      "enabled": true
+      "enabled": true,
+      "supports_ping": false,
+      "supports_traceroute": false
     },
     {
       "name": "Equinix Chicago",
@@ -64,7 +74,9 @@
       "password": "",
       "prompt": ">",
       "timeout": 15,
-      "enabled": true
+      "enabled": true,
+      "supports_ping": false,
+      "supports_traceroute": false
     },
     {
       "name": "NWAX Portland",
@@ -75,7 +87,9 @@
       "password": "",
       "prompt": ">",
       "timeout": 15,
-      "enabled": true
+      "enabled": true,
+      "supports_ping": false,
+      "supports_traceroute": false
     },
     {
       "name": "AMS-IX Amsterdam",
@@ -86,7 +100,9 @@
       "password": "",
       "prompt": ">",
       "timeout": 15,
-      "enabled": true
+      "enabled": true,
+      "supports_ping": false,
+      "supports_traceroute": false
     },
     {
       "name": "Equinix Singapore",
@@ -97,7 +113,9 @@
       "password": "",
       "prompt": ">",
       "timeout": 15,
-      "enabled": true
+      "enabled": true,
+      "supports_ping": false,
+      "supports_traceroute": false
     },
     {
       "name": "HKIX Hong Kong",
@@ -108,7 +126,9 @@
       "password": "",
       "prompt": ">",
       "timeout": 15,
-      "enabled": true
+      "enabled": true,
+      "supports_ping": false,
+      "supports_traceroute": false
     },
     {
       "name": "Equinix Sydney",
@@ -119,7 +139,9 @@
       "password": "",
       "prompt": ">",
       "timeout": 15,
-      "enabled": true
+      "enabled": true,
+      "supports_ping": false,
+      "supports_traceroute": false
     },
     {
       "name": "IX.br São Paulo",
@@ -130,7 +152,9 @@
       "password": "",
       "prompt": ">",
       "timeout": 15,
-      "enabled": true
+      "enabled": true,
+      "supports_ping": false,
+      "supports_traceroute": false
     },
     {
       "name": "RouteViews WIDE",
@@ -141,8 +165,9 @@
       "password": "",
       "prompt": ">",
       "timeout": 15,
-      "enabled": true
+      "enabled": true,
+      "supports_ping": false,
+      "supports_traceroute": false
     }
   ]
 }
-
