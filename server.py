@@ -10,6 +10,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.stdio import stdio_server
 
 from bgp_client import BGPTelnetClient
+from bgpkit_client import lookup_ip
 from validation import validate_ip_or_cidr, get_ip_type
 
 # Setup logging
@@ -277,6 +278,41 @@ async def bgp_summary(server: str = "RouteViews Linx") -> str:
         error_msg = f"Unexpected error querying {server}: {type(e).__name__}: {str(e)}"
         logger.error(error_msg, exc_info=True)
         return error_msg
+
+
+@mcp.tool()
+async def ip_lookup(ip: str) -> str:
+    """Look up country, ASN, covering prefix, and RPKI status for an IP address.
+
+    Uses the BGPKit public API to resolve the IP to its covering BGP prefix
+    and associated autonomous system information including RPKI validation state.
+
+    Args:
+        ip: IPv4 or IPv6 address (e.g., "8.8.8.8" or "2001:4860:4860::8888").
+
+    Returns:
+        JSON-formatted result with country, ASN, prefix, and RPKI details.
+        Returns a descriptive message for private/unrouted IPs or on upstream errors.
+    """
+    import json as _json
+
+    try:
+        result = await lookup_ip(ip)
+    except ValueError as e:
+        return f"Error: {e}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+    except Exception as e:
+        logger.error("Unexpected error in ip_lookup", exc_info=True)
+        return f"Unexpected error: {type(e).__name__}: {e}"
+
+    if result.get("asn") is None:
+        return (
+            f"No BGP route found for {result['ip']}. "
+            "The address may be private, reserved, or currently unrouted."
+        )
+
+    return _json.dumps(result, indent=2)
 
 
 @mcp.tool()

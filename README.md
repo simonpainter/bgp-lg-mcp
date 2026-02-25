@@ -18,6 +18,7 @@ This project wraps 7 public RouteViews servers into an **MCP (Model Context Prot
 
 - **Query live BGP routes** from 7 globally-distributed public route servers
 - **Retrieve BGP summary statistics** including router ID, AS number, neighbor count
+- **IP lookup** - country, covering prefix, ASN details, and RPKI status via BGPKit
 - **IPv4 and IPv6 support** - works with both address families
 - **CIDR notation support** - look up entire subnets
 - **Public IP validation** - blocks private/reserved address ranges for safety
@@ -108,6 +109,45 @@ Display all configured BGP looking-glass servers.
 ```
 list_servers()
 ```
+
+---
+
+### `ip_lookup` - IP Address Metadata
+
+Look up country, ASN, covering BGP prefix, and RPKI validation status for any IPv4 or IPv6 address, powered by the [BGPKit public API](https://api.bgpkit.com/docs).
+
+**Parameters:**
+- `ip` - IPv4 or IPv6 address (e.g., `"8.8.8.8"` or `"2001:4860:4860::8888"`)
+
+**Returns:** JSON object with the following shape:
+
+```json
+{
+  "ip": "8.8.8.8",
+  "country": "US",
+  "asn": {
+    "prefix": "8.8.8.0/24",
+    "asn": 15169,
+    "name": "GOOGLE",
+    "country": "US",
+    "rpki": "Valid",
+    "updatedAt": "2024-01-15T00:00:00Z"
+  }
+}
+```
+
+For private, reserved, or currently unrouted addresses the `asn` object is absent and a descriptive message is returned instead.
+
+**Example:**
+```
+ip_lookup(ip="8.8.8.8")
+ip_lookup(ip="2001:4860:4860::8888")
+```
+
+**Use cases:**
+- Identify which organisation owns an IP address
+- Check RPKI validity of a prefix
+- Correlate an IP with its country of origin and AS name
 
 ## Supported Route Servers
 
