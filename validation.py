@@ -3,9 +3,15 @@
 import ipaddress
 from typing import Union
 
+from pydantic import ValidationError
+
+from models import RouteLookupRequest
+
 
 def validate_ip_or_cidr(destination: str) -> tuple[bool, str]:
     """Validate if destination is a valid public IPv4/IPv6 address or CIDR subnet.
+
+    Uses the RouteLookupRequest Pydantic model for validation.
 
     Args:
         destination: IP address, IPv6 address, or CIDR notation string.
@@ -13,30 +19,20 @@ def validate_ip_or_cidr(destination: str) -> tuple[bool, str]:
     Returns:
         Tuple of (is_valid, message).
     """
-    destination = destination.strip()
-
     try:
-        # Try to parse as CIDR subnet first
-        if "/" in destination:
-            network = ipaddress.ip_network(destination, strict=False)
-            
-            # Check if it's a public address (not private/reserved)
-            if network.is_private or network.is_loopback or network.is_link_local:
-                return False, f"CIDR subnet {destination} is not public"
-            
+        request = RouteLookupRequest(destination=destination)
+        validated = request.destination
+        if "/" in validated:
+            network = ipaddress.ip_network(validated, strict=False)
             return True, f"Valid CIDR subnet: {network}"
-        
-        # Try to parse as individual IP address
-        ip = ipaddress.ip_address(destination)
-        
-        # Check if it's a public address
-        if ip.is_private or ip.is_loopback or ip.is_link_local:
-            return False, f"Address {destination} is not public"
-        
+        ip = ipaddress.ip_address(validated)
         return True, f"Valid IP address: {ip}"
-    
-    except ValueError as e:
-        return False, f"Invalid IP address or CIDR notation: {str(e)}"
+    except ValidationError as e:
+        errors = e.errors()
+        msg = errors[0]["msg"] if errors else "Invalid input"
+        # Strip the "Value error, " prefix that pydantic adds
+        msg = msg.removeprefix("Value error, ")
+        return False, msg
 
 
 def get_ip_type(destination: str) -> str:

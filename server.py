@@ -10,6 +10,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.stdio import stdio_server
 
 from bgp_client import BGPTelnetClient
+from models import AppConfig, ServerConfig, RouteLookupRequest, RouteLookupResponse
 from validation import validate_ip_or_cidr, get_ip_type
 
 # Setup logging
@@ -20,22 +21,23 @@ logger = logging.getLogger(__name__)
 mcp = FastMCP("bgp-lg-mcp")
 
 # Global config
-config = None
+_config: Optional[AppConfig] = None
 config_path = Path(__file__).parent / "config.json"
 
 
-def load_config() -> dict:
+def load_config() -> AppConfig:
     """Load configuration from config.json."""
-    global config
-    
-    if config is not None:
-        return config
-    
+    global _config
+
+    if _config is not None:
+        return _config
+
     try:
         with open(config_path, "r") as f:
-            config = json.load(f)
+            raw = json.load(f)
+        _config = AppConfig.model_validate(raw)
         logger.info(f"Loaded configuration from {config_path}")
-        return config
+        return _config
     except FileNotFoundError:
         logger.error(f"Config file not found at {config_path}")
         raise
@@ -44,18 +46,18 @@ def load_config() -> dict:
         raise
 
 
-def get_server_config(server_name: str) -> Optional[dict]:
+def get_server_config(server_name: str) -> Optional[ServerConfig]:
     """Get configuration for a specific server.
 
     Args:
         server_name: Name of the server.
 
     Returns:
-        Server configuration dict or None if not found.
+        ServerConfig model or None if not found.
     """
-    config_data = load_config()
-    for server in config_data.get("servers", []):
-        if server.get("name") == server_name:
+    app_config = load_config()
+    for server in app_config.servers:
+        if server.name == server_name:
             return server
     return None
 
@@ -66,12 +68,8 @@ def get_available_servers() -> list:
     Returns:
         List of enabled server names.
     """
-    config_data = load_config()
-    return [
-        server.get("name")
-        for server in config_data.get("servers", [])
-        if server.get("enabled", True)
-    ]
+    app_config = load_config()
+    return [server.name for server in app_config.servers if server.enabled]
 
 
 def build_server_description() -> str:
@@ -103,18 +101,18 @@ async def query_bgp_server(server_name: str, destination: str) -> str:
     if not server_config:
         raise ValueError(f"Server '{server_name}' not found in configuration")
 
-    if not server_config.get("enabled", True):
+    if not server_config.enabled:
         raise ValueError(f"Server '{server_name}' is disabled")
 
     try:
         # Create on-demand connection (fast enough for RouteViews servers)
         client = BGPTelnetClient(
-            host=server_config["host"],
-            port=server_config.get("port", 23),
-            username=server_config.get("username", ""),
-            password=server_config.get("password", ""),
-            prompt=server_config.get("prompt", "#"),
-            timeout=server_config.get("timeout", 15),
+            host=server_config.host,
+            port=server_config.port,
+            username=server_config.username,
+            password=server_config.password,
+            prompt=server_config.prompt,
+            timeout=server_config.timeout,
         )
         
         # Connect
@@ -196,7 +194,7 @@ async def bgp_summary(server: str = "RouteViews Linx") -> str:
         logger.error(error_msg)
         return error_msg
 
-    if not server_config.get("enabled", True):
+    if not server_config.enabled:
         error_msg = f"Server '{server}' is disabled"
         logger.error(error_msg)
         return error_msg
@@ -204,53 +202,12 @@ async def bgp_summary(server: str = "RouteViews Linx") -> str:
     try:
         # Create on-demand connection
         client = BGPTelnetClient(
-            host=server_config["host"],
-            port=server_config.get("port", 23),
-            username=server_config.get("username", ""),
-            password=server_config.get("password", ""),
-            prompt=server_config.get("prompt", "#"),
-            timeout=server_config.get("timeout", 15),
-        )
-        
-        # Connect
-        await client.connect()
-        
-        # Send BGP summary command
-        response = await client.send_command("show ip bgp summary")
-        
-        # Close connection
-        await client.close()
-        
-        logger.info(f"Retrieved BGP summary from {server}")
-        return response
-        
-    except ConnectionError as e:
-        error_msg = f"Connection error to {server}: {str(e)} - The BGP server may be unreachable or not accepting connections"
-        logger.error(error_msg)
-        return error_msg
-    except RuntimeError as e:
-        error_msg = f"Query error from {server}: {str(e)}"
-        logger.error(error_msg)
-        return error_msg
-    except Exception as e:
-        error_msg = f"Unexpected error querying {server}: {type(e).__name__}: {str(e)}"
-        logger.error(error_msg, exc_info=True)
-        return error_msg
-
-    if not server_config.get("enabled", True):
-        error_msg = f"Server '{server}' is disabled"
-        logger.error(error_msg)
-        return error_msg
-
-    try:
-        # Create on-demand connection
-        client = BGPTelnetClient(
-            host=server_config["host"],
-            port=server_config.get("port", 23),
-            username=server_config.get("username", ""),
-            password=server_config.get("password", ""),
-            prompt=server_config.get("prompt", "#"),
-            timeout=server_config.get("timeout", 15),
+            host=server_config.host,
+            port=server_config.port,
+            username=server_config.username,
+            password=server_config.password,
+            prompt=server_config.prompt,
+            timeout=server_config.timeout,
         )
         
         # Connect
@@ -287,19 +244,18 @@ def list_servers() -> str:
         List of configured servers with their details.
     """
     try:
-        config_data = load_config()
-        servers = config_data.get("servers", [])
-        
-        if not servers:
+        app_config = load_config()
+
+        if not app_config.servers:
             return "No servers configured."
-        
+
         output = "Configured BGP Looking-Glass Servers:\n"
-        for server in servers:
-            status = "enabled" if server.get("enabled", True) else "disabled"
-            output += f"\n- {server['name']} ({status})\n"
-            output += f"  Host: {server['host']}:{server.get('port', 23)}\n"
-            output += f"  Method: {server.get('connection_method', 'unknown')}\n"
-        
+        for server in app_config.servers:
+            status = "enabled" if server.enabled else "disabled"
+            output += f"\n- {server.name} ({status})\n"
+            output += f"  Host: {server.host}:{server.port}\n"
+            output += f"  Method: {server.connection_method}\n"
+
         return output
     except Exception as e:
         return f"Error listing servers: {str(e)}"
@@ -345,17 +301,16 @@ def run_http_server(
         """Health check endpoint."""
         return {"status": "ok"}
 
-    @app.post("/route-lookup")
-    async def api_route_lookup(destination: str, server: str = "RouteViews Linx"):
+    @app.post("/route-lookup", response_model=RouteLookupResponse)
+    async def api_route_lookup(request: RouteLookupRequest):
         """HTTP endpoint for route lookup."""
-        # Validate destination
-        is_valid, message = validate_ip_or_cidr(destination)
-        if not is_valid:
-            raise HTTPException(status_code=400, detail=f"Invalid destination: {message}")
-
         try:
-            response = await query_bgp_server(server, destination)
-            return {"destination": destination, "server": server, "result": response}
+            result = await query_bgp_server(request.server, request.destination)
+            return RouteLookupResponse(
+                destination=request.destination,
+                server=request.server,
+                result=result,
+            )
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
         except RuntimeError as e:
@@ -365,9 +320,8 @@ def run_http_server(
     async def api_list_servers():
         """HTTP endpoint for listing servers."""
         try:
-            config_data = load_config()
-            servers = config_data.get("servers", [])
-            return {"servers": servers}
+            app_config = load_config()
+            return {"servers": [s.model_dump() for s in app_config.servers]}
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
