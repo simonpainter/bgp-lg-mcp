@@ -71,6 +71,7 @@ venv.bak/
 
 # Project specific
 *.log
+test_*.py
 
 # SSL Certificates (local development only)
 cert.pem
