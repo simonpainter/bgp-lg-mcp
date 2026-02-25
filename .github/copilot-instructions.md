@@ -33,7 +33,7 @@ pyproject.toml     - Project metadata and dependencies
 ## Tech Stack
 
 - **Python 3.10+**
-- **[FastMCP](https://github.com/jlowin/fastmcp)** (`mcp>=1.0.0`) — MCP server framework
+- **`mcp` Python SDK (`mcp>=1.0.0`)** — MCP server framework
 - **FastAPI + uvicorn** — Optional HTTP REST API mode
 - **asyncio** — All I/O is async; use `async`/`await` consistently
 - **uv** — Preferred package manager (lockfile at `uv.lock`)
