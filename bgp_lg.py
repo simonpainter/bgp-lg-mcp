@@ -20,6 +20,76 @@ TELNET_SB = 0xfa  # Subnegotiation
 TELNET_SE = 0xf0  # End of subnegotiation
 
 
+async def _http_request_with_retry(
+    client: httpx.AsyncClient,
+    method: str,
+    url: str,
+    max_retries: int = 3,
+    initial_backoff: float = 0.5,
+    **kwargs,
+) -> httpx.Response:
+    """Make HTTP request with exponential backoff retry logic.
+    
+    Retries on:
+    - 429 (Rate Limit)
+    - 5xx (Server Errors)
+    - Timeout exceptions
+    
+    Args:
+        client: httpx.AsyncClient instance
+        method: HTTP method (GET, POST, etc)
+        url: Request URL
+        max_retries: Maximum number of retry attempts
+        initial_backoff: Initial backoff in seconds
+        **kwargs: Additional arguments to pass to client.request()
+        
+    Returns:
+        httpx.Response object
+        
+    Raises:
+        RuntimeError: On final failure after all retries
+        httpx.TimeoutException: If timeout occurs on final attempt
+    """
+    backoff = initial_backoff
+    last_exception = None
+    
+    for attempt in range(max_retries + 1):
+        try:
+            response = await client.request(method, url, **kwargs)
+            
+            # Don't retry on 404 or other client errors (except 429)
+            if response.status_code == 429:
+                if attempt < max_retries:
+                    await asyncio.sleep(backoff)
+                    backoff *= 2  # Exponential backoff
+                    continue
+                else:
+                    raise RuntimeError("BGPKit API rate limit exceeded after retries, please try again later")
+            
+            if response.status_code >= 500:
+                if attempt < max_retries:
+                    await asyncio.sleep(backoff)
+                    backoff *= 2
+                    continue
+                else:
+                    raise RuntimeError(f"BGPKit API server error (status {response.status_code}) after retries")
+            
+            return response
+            
+        except httpx.TimeoutException as e:
+            last_exception = e
+            if attempt < max_retries:
+                await asyncio.sleep(backoff)
+                backoff *= 2
+                continue
+            else:
+                raise
+    
+    # This should not be reached, but added for type checking
+    raise RuntimeError("HTTP request failed after retries")
+
+
+
 class TelnetClient:
     """Async telnet client for BGP looking-glass servers."""
 
@@ -542,16 +612,12 @@ async def lookup_asn_owner(asn_input: str, timeout: int = 10) -> str:
     
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.get(api_url, params=params)
+            response = await _http_request_with_retry(
+                client, "GET", api_url, params=params
+            )
             
             if response.status_code == 404:
                 raise RuntimeError(f"ASN {asn} not found in BGPKit database")
-            
-            if response.status_code == 429:
-                raise RuntimeError("BGPKit API rate limit exceeded, please try again later")
-            
-            if response.status_code >= 500:
-                raise RuntimeError(f"BGPKit API server error (status {response.status_code})")
             
             response.raise_for_status()
             

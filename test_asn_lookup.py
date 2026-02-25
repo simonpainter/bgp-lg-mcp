@@ -58,14 +58,15 @@ class TestLookupASNOwner:
 
         with patch("bgp_lg.httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
-            mock_client.get.return_value = mock_response
+            mock_client.request.return_value = mock_response
             mock_client.__aenter__.return_value = mock_client
             mock_client.__aexit__.return_value = None
             mock_client_class.return_value = mock_client
 
             result = await lookup_asn_owner("AS15169")
             assert result == "GOOGLE - Google LLC"
-            mock_client.get.assert_called_once_with(
+            mock_client.request.assert_called_once_with(
+                "GET",
                 "https://api.bgpkit.com/v3/utils/asn",
                 params={"asn": 15169}
             )
@@ -78,7 +79,7 @@ class TestLookupASNOwner:
 
         with patch("bgp_lg.httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
-            mock_client.get.return_value = mock_response
+            mock_client.request.return_value = mock_response
             mock_client.__aenter__.return_value = mock_client
             mock_client.__aexit__.return_value = None
             mock_client_class.return_value = mock_client
@@ -88,13 +89,13 @@ class TestLookupASNOwner:
 
     @pytest.mark.asyncio
     async def test_lookup_asn_rate_limit(self):
-        """Test rate limit handling."""
+        """Test rate limit handling with retry."""
         mock_response = MagicMock()
         mock_response.status_code = 429
 
         with patch("bgp_lg.httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
-            mock_client.get.return_value = mock_response
+            mock_client.request.return_value = mock_response
             mock_client.__aenter__.return_value = mock_client
             mock_client.__aexit__.return_value = None
             mock_client_class.return_value = mock_client
@@ -104,13 +105,13 @@ class TestLookupASNOwner:
 
     @pytest.mark.asyncio
     async def test_lookup_asn_server_error(self):
-        """Test server error handling."""
+        """Test server error handling with retry."""
         mock_response = MagicMock()
         mock_response.status_code = 500
 
         with patch("bgp_lg.httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
-            mock_client.get.return_value = mock_response
+            mock_client.request.return_value = mock_response
             mock_client.__aenter__.return_value = mock_client
             mock_client.__aexit__.return_value = None
             mock_client_class.return_value = mock_client
@@ -120,12 +121,12 @@ class TestLookupASNOwner:
 
     @pytest.mark.asyncio
     async def test_lookup_asn_timeout(self):
-        """Test timeout handling."""
+        """Test timeout handling with retry."""
         import httpx
 
         with patch("bgp_lg.httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
-            mock_client.get.side_effect = httpx.TimeoutException("timeout")
+            mock_client.request.side_effect = httpx.TimeoutException("timeout")
             mock_client.__aenter__.return_value = mock_client
             mock_client.__aexit__.return_value = None
             mock_client_class.return_value = mock_client
