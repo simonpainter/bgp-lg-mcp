@@ -10,6 +10,7 @@ from bgp_lg import (
     validate_ip_or_cidr,
     get_ip_type,
     load_config,
+    get_server_config,
     get_available_servers,
     execute_bgp_command,
     lookup_asn_owner,
@@ -309,14 +310,11 @@ async def ping_host(ip: str, server: str = "RouteViews Linx", format: str = "tex
         return f"Error: {message}"
 
     try:
-        # Get config to check server capabilities
-        config = load_config()
-        servers_info = config.get("servers", {})
-        
-        if server not in servers_info:
+        # Get server config to check if server exists and supports ping
+        server_info = get_server_config(server)
+        if not server_info:
             raise ValueError(f"Server '{server}' not found. Call list_servers() to see available servers.")
         
-        server_info = servers_info[server]
         if not server_info.get("supports_ping", False):
             raise ValueError(f"Server '{server}' does not support ping command.")
         
@@ -401,14 +399,11 @@ async def traceroute_host(ip: str, server: str = "RouteViews Linx", format: str 
         return f"Error: {message}"
 
     try:
-        # Get config to check server capabilities
-        config = load_config()
-        servers_info = config.get("servers", {})
-        
-        if server not in servers_info:
+        # Get server config to check if server exists and supports traceroute
+        server_info = get_server_config(server)
+        if not server_info:
             raise ValueError(f"Server '{server}' not found. Call list_servers() to see available servers.")
         
-        server_info = servers_info[server]
         if not server_info.get("supports_traceroute", False):
             raise ValueError(f"Server '{server}' does not support traceroute command.")
         
