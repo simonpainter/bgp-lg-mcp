@@ -536,12 +536,13 @@ async def lookup_asn_owner(asn_input: str, timeout: int = 10) -> str:
     except ValueError as e:
         raise ValueError(f"Invalid ASN: {str(e)}")
     
-    # Call BGPKit API
-    api_url = f"https://api.bgpkit.com/v3/utils/asn/{asn}"
+    # Call BGPKit API - POST to /v3/utils/asn with asn query parameter
+    api_url = "https://api.bgpkit.com/v3/utils/asn"
+    params = {"asn": asn}
     
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.get(api_url)
+            response = await client.post(api_url, params=params)
             
             if response.status_code == 404:
                 raise RuntimeError(f"ASN {asn} not found in BGPKit database")
