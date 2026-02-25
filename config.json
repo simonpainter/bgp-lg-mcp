@@ -1,14 +1,148 @@
 {
   "servers": [
     {
-      "name": "route-server.ip.att.net",
-      "host": "route-server.ip.att.net",
+      "name": "RouteViews Linx",
+      "host": "route-views.linx.routeviews.org",
+      "port": 23,
+      "connection_method": "telnet",
+      "username": "",
+      "password": "",
+      "prompt": ">",
+      "timeout": 15,
+      "enabled": true
+    },
+    {
+      "name": "RouteViews Main",
+      "host": "route-views.routeviews.org",
       "port": 23,
       "connection_method": "telnet",
       "username": "rviews",
       "password": "rviews",
-      "prompt": "route-server#",
+      "prompt": ">",
+      "timeout": 15,
+      "enabled": true
+    },
+    {
+      "name": "RouteViews2",
+      "host": "route-views2.routeviews.org",
+      "port": 23,
+      "connection_method": "telnet",
+      "username": "",
+      "password": "",
+      "prompt": ">",
+      "timeout": 15,
+      "enabled": true
+    },
+    {
+      "name": "Equinix Ashburn",
+      "host": "route-views.eqix.routeviews.org",
+      "port": 23,
+      "connection_method": "telnet",
+      "username": "",
+      "password": "",
+      "prompt": ">",
+      "timeout": 15,
+      "enabled": true
+    },
+    {
+      "name": "DE-CIX New York",
+      "host": "route-views.ny.routeviews.org",
+      "port": 23,
+      "connection_method": "telnet",
+      "username": "",
+      "password": "",
+      "prompt": ">",
+      "timeout": 15,
+      "enabled": true
+    },
+    {
+      "name": "Equinix Chicago",
+      "host": "route-views.chicago.routeviews.org",
+      "port": 23,
+      "connection_method": "telnet",
+      "username": "",
+      "password": "",
+      "prompt": ">",
+      "timeout": 15,
+      "enabled": true
+    },
+    {
+      "name": "NWAX Portland",
+      "host": "route-views.nwax.routeviews.org",
+      "port": 23,
+      "connection_method": "telnet",
+      "username": "",
+      "password": "",
+      "prompt": ">",
+      "timeout": 15,
+      "enabled": true
+    },
+    {
+      "name": "AMS-IX Amsterdam",
+      "host": "amsix.ams.routeviews.org",
+      "port": 23,
+      "connection_method": "telnet",
+      "username": "",
+      "password": "",
+      "prompt": ">",
+      "timeout": 15,
+      "enabled": true
+    },
+    {
+      "name": "Equinix Singapore",
+      "host": "route-views.sg.routeviews.org",
+      "port": 23,
+      "connection_method": "telnet",
+      "username": "",
+      "password": "",
+      "prompt": ">",
+      "timeout": 15,
+      "enabled": true
+    },
+    {
+      "name": "HKIX Hong Kong",
+      "host": "hkix.hkg.routeviews.org",
+      "port": 23,
+      "connection_method": "telnet",
+      "username": "",
+      "password": "",
+      "prompt": ">",
+      "timeout": 15,
+      "enabled": true
+    },
+    {
+      "name": "Equinix Sydney",
+      "host": "route-views.sydney.routeviews.org",
+      "port": 23,
+      "connection_method": "telnet",
+      "username": "",
+      "password": "",
+      "prompt": ">",
+      "timeout": 15,
+      "enabled": true
+    },
+    {
+      "name": "IX.br São Paulo",
+      "host": "ix-br.gru.routeviews.org",
+      "port": 23,
+      "connection_method": "telnet",
+      "username": "",
+      "password": "",
+      "prompt": ">",
+      "timeout": 15,
+      "enabled": true
+    },
+    {
+      "name": "RouteViews WIDE",
+      "host": "route-views.wide.routeviews.org",
+      "port": 23,
+      "connection_method": "telnet",
+      "username": "",
+      "password": "",
+      "prompt": ">",
+      "timeout": 15,
       "enabled": true
     }
   ]
 }
+

@@ -1,0 +1,4 @@
+mcp>=1.0.0
+uvicorn[standard]>=0.23.0
+gunicorn>=22.0.0
+starlette>=0.40.0
