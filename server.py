@@ -12,6 +12,7 @@ from bgp_lg import (
     get_available_servers,
     execute_bgp_command,
     lookup_asn_owner,
+    lookup_ip_geolocation,
 )
 
 
@@ -121,6 +122,41 @@ async def asn_owner(asn: str) -> str:
         return f"ASN {asn}: {owner_name}"
     except ValueError as e:
         return f"Invalid ASN: {str(e)}"
+    except RuntimeError as e:
+        return f"Lookup error: {str(e)}"
+    except Exception as e:
+        return f"Unexpected error: {type(e).__name__}: {str(e)}"
+
+
+@mcp.tool()
+async def ip_lookup(ip: str) -> str:
+    """Look up geolocation and BGP metadata for an IP address.
+
+    Uses the BGPKit public API to retrieve IP geolocation information including
+    country, covering prefix, ASN, and RPKI validation status.
+
+    Args:
+        ip: IPv4 or IPv6 address (e.g., "8.8.8.8" or "2001:4860:4860::8888").
+            Must be a public address (not private or reserved).
+
+    Returns:
+        Dictionary-formatted string with: ip, country, asn, prefix, name, rpki, updated_at
+    """
+    try:
+        result = await lookup_ip_geolocation(ip)
+        
+        # Format response
+        output = f"IP Lookup: {result['ip']}\n"
+        output += f"Country: {result['country']}\n"
+        output += f"ASN: {result['asn']}\n"
+        output += f"Prefix: {result['prefix']}\n"
+        output += f"Name: {result['name']}\n"
+        output += f"RPKI Status: {result['rpki']}\n"
+        output += f"Updated: {result['updated_at']}"
+        
+        return output
+    except ValueError as e:
+        return f"Invalid IP address: {str(e)}"
     except RuntimeError as e:
         return f"Lookup error: {str(e)}"
     except Exception as e:

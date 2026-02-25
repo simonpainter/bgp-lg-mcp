@@ -643,3 +643,68 @@ async def lookup_asn_owner(asn_input: str, timeout: int = 10) -> str:
         raise RuntimeError(f"BGPKit API request failed: {str(e)}")
     except json.JSONDecodeError:
         raise RuntimeError("BGPKit API returned invalid JSON")
+
+
+async def lookup_ip_geolocation(ip_input: str, timeout: int = 10) -> dict:
+    """Look up geolocation and BGP metadata for an IP address using BGPKit API.
+
+    Args:
+        ip_input: IPv4 or IPv6 address (e.g., "8.8.8.8" or "2001:4860:4860::8888")
+        timeout: Request timeout in seconds
+
+    Returns:
+        Dictionary with keys: ip, country, asn, prefix, name, rpki, updated_at
+
+    Raises:
+        ValueError: If IP format is invalid or private
+        RuntimeError: If API request fails
+    """
+    # Validate IP address
+    ip_input = ip_input.strip()
+    
+    try:
+        ip_obj = ipaddress.ip_address(ip_input)
+    except ValueError:
+        raise ValueError(f"Invalid IP address: {ip_input}")
+    
+    # Reject private/reserved IPs
+    if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_reserved:
+        raise ValueError(f"IP address {ip_input} is private, reserved, or loopback")
+    
+    # Call BGPKit API - GET /v3/utils/ip with ip query parameter
+    api_url = "https://api.bgpkit.com/v3/utils/ip"
+    params = {"ip": ip_input}
+    
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await _http_request_with_retry(
+                client, "GET", api_url, params=params
+            )
+            
+            if response.status_code == 404:
+                raise RuntimeError(f"IP {ip_input} not found in BGPKit database")
+            
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            # Extract required fields from response
+            asn_info = data.get("asn", {})
+            
+            return {
+                "ip": data.get("ip"),
+                "country": data.get("country"),
+                "asn": asn_info.get("asn"),
+                "prefix": asn_info.get("prefix"),
+                "name": asn_info.get("name"),
+                "rpki": asn_info.get("rpki"),
+                "updated_at": asn_info.get("updatedAt"),
+            }
+            
+    except httpx.TimeoutException:
+        raise RuntimeError(f"BGPKit API request timed out after {timeout}s")
+    except httpx.RequestError as e:
+        raise RuntimeError(f"BGPKit API request failed: {str(e)}")
+    except json.JSONDecodeError:
+        raise RuntimeError("BGPKit API returned invalid JSON")
+

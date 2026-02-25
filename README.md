@@ -14,11 +14,13 @@ This project wraps 7 public RouteViews servers into an **MCP (Model Context Prot
 - "Is this prefix routed?"
 - "How many BGP neighbors does the Linx route server have?"
 - "Who owns AS15169?"
+- "Which country is IP 1.1.1.1 located in?"
 - "Compare routes to 1.1.1.1 across different regions"
 
 ## Features
 
 - **Query live BGP routes** from 7 globally-distributed public route servers
+- **Look up IP geolocation & BGP metadata** using BGPKit public API
 - **Look up ASN ownership** using BGPKit public API
 - **Retrieve BGP summary statistics** including router ID, AS number, neighbor count
 - **IPv4 and IPv6 support** - works with both address families
@@ -144,6 +146,54 @@ asn_owner(asn="AS64512")
 - Identify who operates a particular AS
 - Verify AS ownership when analyzing routing information
 - Understand the entities involved in a BGP path
+
+---
+
+### `ip_lookup` - Geolocation and BGP Metadata
+
+Look up geolocation information and BGP metadata for an IP address using BGPKit API.
+
+**Parameters:**
+
+- `ip` - IPv4 or IPv6 address (e.g., `8.8.8.8` or `2001:4860:4860::8888`)
+  - Must be a public address (private/reserved addresses are rejected for safety)
+
+**Returns:** IP geolocation data including:
+
+- **Country** - GeoIP country code
+- **ASN** - Autonomous System Number announcing the IP
+- **Prefix** - CIDR prefix covering the IP
+- **Name** - Organization name (if available)
+- **RPKI** - RPKI validation status (valid/invalid/unknown)
+- **Updated** - Timestamp of last update
+
+**Example:**
+
+```python
+ip_lookup(ip="8.8.8.8")
+ip_lookup(ip="1.1.1.1")
+ip_lookup(ip="2001:4860:4860::8888")
+```
+
+**Example Output:**
+
+```
+IP Lookup: 8.8.8.8
+Country: US
+ASN: 15169
+Prefix: 8.8.8.0/24
+Name: Google, YouTube (for Google Fiber see AS16591 record)
+RPKI Status: valid
+Updated: 2026-02-25T10:00:00
+```
+
+**Use cases:**
+
+- Determine which country an IP address is located in
+- Find which organization operates an IP
+- Verify RPKI signing status of announced prefixes
+- Map traffic sources to organizations
+- Verify prefix ownership
 
 ## Supported Route Servers
 
