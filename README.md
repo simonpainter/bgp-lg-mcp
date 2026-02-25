@@ -55,6 +55,23 @@ The BGP Looking Glass tools will appear in your MCP tools list. Start asking abo
 
 ## Available Tools
 
+### `asn_lookup` - Look Up an ASN Owner
+
+Return the registered owner name for an Autonomous System Number.
+
+**Parameters:**
+- `asn` - ASN as a plain number (e.g., `13335`) or with the `AS` prefix (e.g., `AS13335`). Both forms are accepted.
+
+**Returns:** The owner name string registered for the ASN (e.g., `CLOUDFLARENET`).
+
+**Example:**
+```
+asn_lookup(asn="13335")      # → CLOUDFLARENET
+asn_lookup(asn="AS15169")    # → GOOGLE
+```
+
+---
+
 ### `route_lookup` - Query BGP Routes
 
 Look up how a specific IP address or subnet would be routed.

@@ -1,11 +1,14 @@
 """BGP Looking Glass MCP Server."""
 
+import asyncio
 import json
 import logging
+import re
 import sys
 from pathlib import Path
 from typing import Optional
 
+import httpx
 from mcp.server.fastmcp import FastMCP
 from mcp.server.stdio import stdio_server
 
@@ -132,6 +135,144 @@ async def query_bgp_server(server_name: str, destination: str) -> str:
         
     except Exception as e:
         raise RuntimeError(f"Failed to query {server_name}: {str(e)}")
+
+
+_BGPKIT_ASN_URL = "https://api.bgpkit.com/v3/utils/asn/{asn}"
+_BGPKIT_TIMEOUT = 10.0
+_BGPKIT_MAX_RETRIES = 3
+
+
+def _parse_asn(asn_input: str) -> int:
+    """Parse an ASN from string input, accepting 'AS123' or '123' forms.
+
+    Args:
+        asn_input: ASN as a string, e.g. '13335' or 'AS13335'.
+
+    Returns:
+        ASN as an integer.
+
+    Raises:
+        ValueError: If the input is not a valid ASN.
+    """
+    stripped = asn_input.strip().upper()
+    if stripped.startswith("AS"):
+        stripped = stripped[2:]
+    if not re.fullmatch(r"\d+", stripped):
+        raise ValueError(f"Invalid ASN '{asn_input}': must be a number or 'AS<number>'")
+    value = int(stripped)
+    if value < 1 or value > 4294967295:
+        raise ValueError(f"ASN {value} is out of valid range (1–4294967295)")
+    return value
+
+
+async def _fetch_asn_name(asn: int) -> str:
+    """Fetch the owner name for an ASN from the BGPKit API.
+
+    Retries up to _BGPKIT_MAX_RETRIES times with simple exponential backoff
+    on transient errors (5xx / network failures).
+
+    Args:
+        asn: Autonomous System Number.
+
+    Returns:
+        Owner name string.
+
+    Raises:
+        ValueError: ASN not found (404).
+        RuntimeError: Upstream error or unexpected response.
+    """
+    url = _BGPKIT_ASN_URL.format(asn=asn)
+    last_error: Exception = RuntimeError("No attempts made")
+
+    async with httpx.AsyncClient(timeout=_BGPKIT_TIMEOUT) as client:
+        for attempt in range(_BGPKIT_MAX_RETRIES):
+            if attempt > 0:
+                await asyncio.sleep(2 ** (attempt - 1))
+            try:
+                response = await client.get(url)
+            except httpx.TimeoutException as exc:
+                last_error = RuntimeError(f"Request timed out after {_BGPKIT_TIMEOUT}s")
+                logger.warning("ASN lookup timeout on attempt %d: %s", attempt + 1, exc)
+                continue
+            except httpx.RequestError as exc:
+                last_error = RuntimeError(f"Network error: {exc}")
+                logger.warning("ASN lookup network error on attempt %d: %s", attempt + 1, exc)
+                continue
+
+            if response.status_code == 404:
+                raise ValueError(f"ASN {asn} not found")
+            if response.status_code == 429:
+                raise RuntimeError("Rate limited by BGPKit API – please try again later")
+            if response.status_code >= 500:
+                last_error = RuntimeError(
+                    f"BGPKit API returned {response.status_code} – upstream error"
+                )
+                logger.warning(
+                    "ASN lookup upstream error %d on attempt %d",
+                    response.status_code,
+                    attempt + 1,
+                )
+                continue
+            if response.status_code != 200:
+                raise RuntimeError(
+                    f"Unexpected response from BGPKit API: HTTP {response.status_code}"
+                )
+
+            try:
+                data = response.json()
+            except Exception as exc:
+                raise RuntimeError(f"Invalid JSON from BGPKit API: {exc}") from exc
+
+            name = None
+            data_block = data.get("data")
+            if isinstance(data_block, dict):
+                name = data_block.get("name")
+            if name is None:
+                # Try top-level 'name' as a fallback
+                name = data.get("name")
+            if not name:
+                raise RuntimeError("BGPKit API response missing 'name' field")
+            return str(name)
+
+    raise last_error
+
+
+@mcp.tool()
+async def asn_lookup(asn: str) -> str:
+    """Look up the owner name of an Autonomous System Number (ASN).
+
+    Queries the BGPKit API to return the registered owner name for the given ASN.
+
+    Accepts the ASN in plain numeric form (e.g. ``13335``) or with the 'AS' prefix
+    (e.g. ``AS13335``).  Both upper-case and lower-case prefixes are accepted.
+
+    Args:
+        asn: Autonomous System Number, e.g. '13335' or 'AS13335'.
+
+    Returns:
+        The registered owner name of the ASN, e.g. 'CLOUDFLARENET'.
+    """
+    try:
+        asn_int = _parse_asn(asn)
+    except ValueError as exc:
+        return f"Error: {exc}"
+
+    logger.info("Looking up ASN %d via BGPKit API", asn_int)
+    try:
+        name = await _fetch_asn_name(asn_int)
+        return name
+    except ValueError as exc:
+        error_msg = f"Error: {exc}"
+        logger.error(error_msg)
+        return error_msg
+    except RuntimeError as exc:
+        error_msg = f"Error: {exc}"
+        logger.error(error_msg)
+        return error_msg
+    except Exception as exc:
+        error_msg = f"Unexpected error: {type(exc).__name__}: {exc}"
+        logger.error(error_msg, exc_info=True)
+        return error_msg
 
 
 @mcp.tool()
