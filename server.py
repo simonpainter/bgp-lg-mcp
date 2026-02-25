@@ -292,27 +292,27 @@ async def ip_lookup(ip: str) -> str:
 
     Returns:
         JSON-formatted result with country, ASN, prefix, and RPKI details.
-        Returns a descriptive message for private/unrouted IPs or on upstream errors.
+        For private/unrouted IPs, returns JSON with "asn" set to null and a
+        "message" field explaining that no BGP route was found.
+        On input or upstream errors, returns a JSON object with an "error" field.
     """
-    import json as _json
-
     try:
         result = await lookup_ip(ip)
     except ValueError as e:
-        return f"Error: {e}"
+        return json.dumps({"error": str(e)})
     except RuntimeError as e:
-        return f"Error: {e}"
+        return json.dumps({"error": str(e)})
     except Exception as e:
         logger.error("Unexpected error in ip_lookup", exc_info=True)
-        return f"Unexpected error: {type(e).__name__}: {e}"
+        return json.dumps({"error": f"{type(e).__name__}: {e}"})
 
     if result.get("asn") is None:
-        return (
-            f"No BGP route found for {result['ip']}. "
-            "The address may be private, reserved, or currently unrouted."
+        result["message"] = (
+            "No BGP route found for this address. "
+            "It may be private, reserved, or currently unrouted."
         )
 
-    return _json.dumps(result, indent=2)
+    return json.dumps(result, indent=2)
 
 
 @mcp.tool()

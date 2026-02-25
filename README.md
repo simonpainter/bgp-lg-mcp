@@ -119,7 +119,7 @@ Look up country, ASN, covering BGP prefix, and RPKI validation status for any IP
 **Parameters:**
 - `ip` - IPv4 or IPv6 address (e.g., `"8.8.8.8"` or `"2001:4860:4860::8888"`)
 
-**Returns:** JSON object with the following shape:
+**Returns:** Always returns a JSON object. For routed public IPs:
 
 ```json
 {
@@ -136,7 +136,24 @@ Look up country, ASN, covering BGP prefix, and RPKI validation status for any IP
 }
 ```
 
-For private, reserved, or currently unrouted addresses the `asn` object is absent and a descriptive message is returned instead.
+For private, reserved, or currently unrouted addresses `"asn"` is `null` and an explanatory `"message"` field is included:
+
+```json
+{
+  "ip": "192.168.1.1",
+  "country": null,
+  "asn": null,
+  "message": "No BGP route found for this address. It may be private, reserved, or currently unrouted."
+}
+```
+
+On input validation failures or upstream errors, an `"error"` field is returned:
+
+```json
+{
+  "error": "Invalid IP address: 'not-an-ip'"
+}
+```
 
 **Example:**
 ```

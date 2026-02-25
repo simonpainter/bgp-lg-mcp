@@ -9,6 +9,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 BGPKIT_API_BASE = "https://api.bgpkit.com/v3"
+
 REQUEST_TIMEOUT = 10  # seconds
 
 
@@ -67,22 +68,28 @@ async def lookup_ip(ip: str) -> dict[str, Any]:
     url = f"{BGPKIT_API_BASE}/ip-info"
     params = {"ip": normalised}
 
+    logger.debug("Querying BGPKit ip-info for %s", normalised)
+
     try:
         async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
             response = await client.get(url, params=params)
     except httpx.TimeoutException as exc:
+        logger.error("BGPKit API request timed out for %s", normalised)
         raise RuntimeError(
             f"BGPKit API request timed out after {REQUEST_TIMEOUT}s"
         ) from exc
     except httpx.RequestError as exc:
+        logger.error("BGPKit API request failed for %s: %s", normalised, exc)
         raise RuntimeError(f"BGPKit API request failed: {exc}") from exc
 
     if response.status_code == 429:
+        logger.warning("BGPKit API rate limit exceeded")
         raise RuntimeError(
             "BGPKit API rate limit exceeded. Please wait before retrying."
         )
 
     if response.status_code != 200:
+        logger.error("BGPKit API returned HTTP %s for %s", response.status_code, normalised)
         raise RuntimeError(
             f"BGPKit API returned HTTP {response.status_code}: {response.text}"
         )
@@ -95,10 +102,27 @@ async def lookup_ip(ip: str) -> dict[str, Any]:
         ) from exc
 
     # BGPKit wraps its response in {"code": 200, "data": {...}}
-    data = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(payload, dict):
+        raise RuntimeError(
+            f"BGPKit API returned unexpected response shape: {response.text}"
+        )
+
+    api_code = payload.get("code")
+    if api_code is not None and api_code != 200:
+        message = payload.get("message", response.text)
+        logger.error("BGPKit API-level error (code=%s): %s", api_code, message)
+        raise RuntimeError(f"BGPKit API error (code {api_code}): {message}")
+
+    data = payload.get("data")
     if data is None:
-        # Treat as no-match (private / unrouted)
+        # No BGP route found (private / unrouted)
+        logger.debug("No BGP route data for %s", normalised)
         return {"ip": normalised, "country": None, "asn": None}
+
+    if not isinstance(data, dict):
+        raise RuntimeError(
+            f"BGPKit API returned unexpected data shape: {response.text}"
+        )
 
     country = data.get("country")
 

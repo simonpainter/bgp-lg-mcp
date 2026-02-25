@@ -6,7 +6,7 @@ import httpx
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from bgpkit_client import lookup_ip, _validate_ip, BGPKIT_API_BASE
+from bgpkit_client import lookup_ip, _validate_ip
 
 
 # ---------------------------------------------------------------------------
@@ -221,6 +221,21 @@ async def test_lookup_ip_request_error():
 
 
 @pytest.mark.asyncio
+async def test_lookup_ip_api_level_error():
+    """BGPKit returning HTTP 200 with a non-200 code in the payload should raise RuntimeError."""
+    mock_resp = _mock_response(200, {"code": 400, "message": "invalid IP"})
+
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.get = AsyncMock(return_value=mock_resp)
+
+    with patch("bgpkit_client.httpx.AsyncClient", return_value=mock_client):
+        with pytest.raises(RuntimeError, match="API error"):
+            await lookup_ip("8.8.8.8")
+
+
+@pytest.mark.asyncio
 async def test_lookup_ip_non_json_response():
     mock_resp = _mock_response(200, "this is not json")
 
@@ -268,7 +283,7 @@ async def test_mcp_ip_lookup_happy_path():
 
 @pytest.mark.asyncio
 async def test_mcp_ip_lookup_unrouted():
-    """The MCP tool should return a descriptive message for private IPs."""
+    """Unrouted/private IPs should return JSON with asn=null and a message field."""
     from server import ip_lookup as mcp_ip_lookup
 
     unrouted = {"ip": "10.0.0.1", "country": None, "asn": None}
@@ -276,29 +291,34 @@ async def test_mcp_ip_lookup_unrouted():
     with patch("server.lookup_ip", AsyncMock(return_value=unrouted)):
         output = await mcp_ip_lookup("10.0.0.1")
 
-    assert "No BGP route found" in output
-    assert "10.0.0.1" in output
+    parsed = json.loads(output)
+    assert parsed["ip"] == "10.0.0.1"
+    assert parsed["asn"] is None
+    assert "message" in parsed
+    assert "No BGP route" in parsed["message"]
 
 
 @pytest.mark.asyncio
 async def test_mcp_ip_lookup_invalid_ip():
-    """The MCP tool should propagate ValueError as an error string."""
+    """The MCP tool should return JSON with an error field for invalid IPs."""
     from server import ip_lookup as mcp_ip_lookup
 
     with patch("server.lookup_ip", AsyncMock(side_effect=ValueError("Invalid IP address: 'bad'"))):
         output = await mcp_ip_lookup("bad")
 
-    assert output.startswith("Error:")
-    assert "Invalid IP" in output
+    parsed = json.loads(output)
+    assert "error" in parsed
+    assert "Invalid IP" in parsed["error"]
 
 
 @pytest.mark.asyncio
 async def test_mcp_ip_lookup_rate_limit():
-    """Rate limit errors should be surfaced cleanly."""
+    """Rate limit errors should be surfaced as JSON with an error field."""
     from server import ip_lookup as mcp_ip_lookup
 
     with patch("server.lookup_ip", AsyncMock(side_effect=RuntimeError("rate limit exceeded"))):
         output = await mcp_ip_lookup("8.8.8.8")
 
-    assert "Error:" in output
-    assert "rate limit" in output
+    parsed = json.loads(output)
+    assert "error" in parsed
+    assert "rate limit" in parsed["error"]
