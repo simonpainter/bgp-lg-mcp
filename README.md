@@ -18,6 +18,7 @@ This project wraps 7 public RouteViews servers into an **MCP (Model Context Prot
 
 - **Query live BGP routes** from 7 globally-distributed public route servers
 - **Retrieve BGP summary statistics** including router ID, AS number, neighbor count
+- **IP lookup** - country, covering prefix, ASN details, and RPKI status via BGPKit
 - **IPv4 and IPv6 support** - works with both address families
 - **CIDR notation support** - look up entire subnets
 - **Public IP validation** - blocks private/reserved address ranges for safety
@@ -53,6 +54,23 @@ Add this to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 The BGP Looking Glass tools will appear in your MCP tools list. Start asking about BGP!
 
 ## Available Tools
+
+### `asn_lookup` - Look Up an ASN Owner
+
+Return the registered owner name for an Autonomous System Number.
+
+**Parameters:**
+- `asn` - ASN as a plain number (e.g., `13335`) or with the `AS` prefix (e.g., `AS13335`). Both forms are accepted.
+
+**Returns:** The owner name string registered for the ASN (e.g., `CLOUDFLARENET`).
+
+**Example:**
+```
+asn_lookup(asn="13335")      # → CLOUDFLARENET
+asn_lookup(asn="AS15169")    # → GOOGLE
+```
+
+---
 
 ### `route_lookup` - Query BGP Routes
 
@@ -108,6 +126,62 @@ Display all configured BGP looking-glass servers.
 ```
 list_servers()
 ```
+
+---
+
+### `ip_lookup` - IP Address Metadata
+
+Look up country, ASN, covering BGP prefix, and RPKI validation status for any IPv4 or IPv6 address, powered by the [BGPKit public API](https://api.bgpkit.com/docs).
+
+**Parameters:**
+- `ip` - IPv4 or IPv6 address (e.g., `"8.8.8.8"` or `"2001:4860:4860::8888"`)
+
+**Returns:** Always returns a JSON object. For routed public IPs:
+
+```json
+{
+  "ip": "8.8.8.8",
+  "country": "US",
+  "asn": {
+    "prefix": "8.8.8.0/24",
+    "asn": 15169,
+    "name": "GOOGLE",
+    "country": "US",
+    "rpki": "Valid",
+    "updatedAt": "2024-01-15T00:00:00Z"
+  }
+}
+```
+
+For private, reserved, or currently unrouted addresses `"asn"` is `null` and an explanatory `"message"` field is included:
+
+```json
+{
+  "ip": "192.168.1.1",
+  "country": null,
+  "asn": null,
+  "message": "No BGP route found for this address. It may be private, reserved, or currently unrouted."
+}
+```
+
+On input validation failures or upstream errors, an `"error"` field is returned:
+
+```json
+{
+  "error": "Invalid IP address: 'not-an-ip'"
+}
+```
+
+**Example:**
+```
+ip_lookup(ip="8.8.8.8")
+ip_lookup(ip="2001:4860:4860::8888")
+```
+
+**Use cases:**
+- Identify which organisation owns an IP address
+- Check RPKI validity of a prefix
+- Correlate an IP with its country of origin and AS name
 
 ## Supported Route Servers
 
@@ -231,6 +305,15 @@ Claude: Yes, the Linx route server is operating normally with X neighbors...
 
 - Python 3.7+
 - Dependencies listed in `requirements.txt` (FastAPI, uvicorn, mcp)
+
+## Development
+
+Install the package with dev dependencies and run the test suite:
+
+```bash
+pip install -e ".[dev]"
+pytest
+```
 
 ## Limitations
 
