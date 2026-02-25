@@ -1,10 +1,11 @@
-"""Telnet client for BGP looking-glass servers."""
+"""BGP Looking Glass library - worker functions and telnet client."""
 
 import asyncio
-import logging
+import ipaddress
+import json
+import os
+from pathlib import Path
 from typing import Optional
-
-logger = logging.getLogger(__name__)
 
 # Telnet protocol constants
 TELNET_IAC = 0xff  # Interpret As Command
@@ -16,7 +17,7 @@ TELNET_SB = 0xfa  # Subnegotiation
 TELNET_SE = 0xf0  # End of subnegotiation
 
 
-class BGPTelnetClient:
+class TelnetClient:
     """Async telnet client for BGP looking-glass servers."""
 
     def __init__(
@@ -46,7 +47,6 @@ class BGPTelnetClient:
         self.timeout = timeout
         self.reader: Optional[asyncio.StreamReader] = None
         self.writer: Optional[asyncio.StreamWriter] = None
-        self._connection_loop: Optional[asyncio.AbstractEventLoop] = None
 
     def _handle_telnet_negotiation(self, data: bytes) -> tuple[bytes, bytes]:
         """Handle telnet protocol negotiation.
@@ -71,7 +71,6 @@ class BGPTelnetClient:
                     # Server asking if we support an option
                     if i + 2 < len(data):
                         opt = data[i + 2]
-                        logger.debug(f"Telnet: Server DO {opt}")
                         # Respond with WONT (we don't support most options)
                         response += bytes([TELNET_IAC, TELNET_WONT, opt])
                         i += 3
@@ -80,8 +79,6 @@ class BGPTelnetClient:
                 elif cmd == TELNET_DONT:
                     # Server saying not to use an option
                     if i + 2 < len(data):
-                        opt = data[i + 2]
-                        logger.debug(f"Telnet: Server DONT {opt}")
                         i += 3
                         continue
                         
@@ -89,7 +86,6 @@ class BGPTelnetClient:
                     # Server saying it will use an option
                     if i + 2 < len(data):
                         opt = data[i + 2]
-                        logger.debug(f"Telnet: Server WILL {opt}")
                         # Respond with DONT (we don't want most options)
                         response += bytes([TELNET_IAC, TELNET_DONT, opt])
                         i += 3
@@ -98,14 +94,11 @@ class BGPTelnetClient:
                 elif cmd == TELNET_WONT:
                     # Server saying it won't use an option
                     if i + 2 < len(data):
-                        opt = data[i + 2]
-                        logger.debug(f"Telnet: Server WONT {opt}")
                         i += 3
                         continue
                         
                 elif cmd == TELNET_SB:
                     # Subnegotiation - skip until SE
-                    logger.debug(f"Telnet: Server subnegotiation")
                     i += 2
                     while i < len(data) and not (data[i:i+1] == bytes([TELNET_IAC]) and i + 1 < len(data) and data[i + 1] == TELNET_SE):
                         i += 1
@@ -113,7 +106,6 @@ class BGPTelnetClient:
                         i += 2
                     continue
                 else:
-                    logger.debug(f"Telnet: Unknown command {cmd}")
                     cleaned += data[i:i+1]
                     i += 1
                     continue
@@ -126,56 +118,26 @@ class BGPTelnetClient:
     async def connect(self) -> None:
         """Connect to telnet server and authenticate."""
         try:
-            logger.info(f"Connecting to {self.host}:{self.port}...")
             self.reader, self.writer = await asyncio.wait_for(
                 asyncio.open_connection(self.host, self.port),
                 timeout=self.timeout,
             )
-            # Track which event loop this connection was created in
-            self._connection_loop = asyncio.get_event_loop()
-            logger.info(f"✓ Connected to {self.host}:{self.port}")
 
             # Read initial banner/prompt
-            logger.debug("Reading initial banner/prompt...")
             banner = await self._read_until_prompt(max_wait=15, require_prompt=False)
-            logger.info(f"✓ Received banner ({len(banner)} bytes)")
-            logger.debug(f"Banner content:\n{banner}")
 
             # Authenticate if credentials provided
             if self.username:
-                logger.debug(f"Authenticating with username: {self.username}")
                 await self._send_command(self.username)
                 response = await self._read_until_prompt(max_wait=self.timeout)
-                logger.info(f"✓ Username accepted")
-                logger.debug(f"Username response:\n{response}")
 
             if self.password:
-                logger.debug(f"Sending password...")
                 await self._send_command(self.password)
                 response = await self._read_until_prompt(max_wait=self.timeout)
-                logger.info(f"✓ Password accepted")
-                logger.debug(f"Password response:\n{response}")
 
-            # Disable pager for Junos-based routers (try different syntaxes)
-            logger.debug("Disabling pager...")
-            for pager_cmd in ["set cli pager off", "set pager off"]:
-                try:
-                    await self._send_command(pager_cmd)
-                    response = await self._read_until_prompt(max_wait=3)
-                    if "syntax error" not in response.lower():
-                        logger.info(f"✓ Pager disabled with: {pager_cmd}")
-                        break
-                except Exception as e:
-                    logger.debug(f"Pager command '{pager_cmd}' failed: {e}")
-                    continue
-
-            logger.info(f"✓ Successfully authenticated on {self.host}")
-
-        except asyncio.TimeoutError as e:
-            logger.error(f"✗ Timeout connecting to {self.host}:{self.port}")
+        except asyncio.TimeoutError:
             raise ConnectionError(f"Timeout connecting to {self.host}:{self.port}")
         except Exception as e:
-            logger.error(f"✗ Failed to connect to {self.host}: {str(e)}", exc_info=True)
             raise ConnectionError(f"Failed to connect to {self.host}: {str(e)}")
 
     async def _send_command(self, command: str) -> None:
@@ -184,12 +146,9 @@ class BGPTelnetClient:
             raise ConnectionError("Not connected")
 
         command_bytes = f"{command}\n".encode()
-        logger.debug(f"Sending: {repr(command)}")
-        logger.debug(f"Bytes ({len(command_bytes)}): {command_bytes.hex()}")
         
         self.writer.write(command_bytes)
         await self.writer.drain()
-        logger.debug("✓ Command sent and drained")
 
     async def _read_until_prompt(self, max_wait: int = 5, require_prompt: bool = True) -> str:
         """Read from server until prompt is found or timeout.
@@ -204,8 +163,8 @@ class BGPTelnetClient:
         output = b""
         bytes_read = 0
         start_time = asyncio.get_event_loop().time()
-        read_timeout = 1.0  # Shorter read timeout for faster responsiveness
-        had_data = False  # Track if we've ever received data
+        read_timeout = 1.0
+        had_data = False
         
         try:
             while True:
@@ -217,29 +176,24 @@ class BGPTelnetClient:
                     )
                     
                     if not chunk:
-                        logger.warning("✗ Connection closed by server")
                         break
 
                     bytes_read += len(chunk)
-                    elapsed = asyncio.get_event_loop().time() - start_time
                     had_data = True
                     
                     # Handle telnet negotiation
                     cleaned, telnet_response = self._handle_telnet_negotiation(chunk)
                     
                     if telnet_response and self.writer:
-                        logger.debug(f"Sending telnet response: {telnet_response.hex()}")
                         self.writer.write(telnet_response)
                         await self.writer.drain()
                     
                     if cleaned:
                         output += cleaned
-                        logger.debug(f"Received: {len(cleaned)} bytes (total: {bytes_read}, elapsed: {elapsed:.2f}s)")
 
                     # Check for pager output and handle it
                     decoded_partial = output.decode(errors="replace")
                     if "---(more)---" in decoded_partial or "---(" in decoded_partial:
-                        logger.debug("✓ Found pager marker, sending 'q' to quit paging")
                         if self.writer:
                             self.writer.write(b"q")
                             await self.writer.drain()
@@ -249,11 +203,9 @@ class BGPTelnetClient:
 
                     # Check if prompt is in output
                     if self.prompt.encode() in output:
-                        logger.debug(f"✓ Found prompt '{self.prompt}'")
                         break
                     elif cleaned and not require_prompt:
                         # For banner-like responses, return after getting some data
-                        logger.debug(f"✓ Got data ({len(output)} bytes), returning (prompt not required)")
                         break
                         
                 except asyncio.TimeoutError:
@@ -263,59 +215,29 @@ class BGPTelnetClient:
                     if not had_data:
                         if elapsed > max_wait:
                             raise ConnectionError(f"No response from server within {max_wait}s")
-                        logger.debug(f"No data yet at {elapsed:.2f}s, continuing...")
                         continue
                     
                     # If we have data but no prompt, and we don't require prompt, return it
                     if output and not require_prompt:
-                        logger.debug(f"✓ Returning after {elapsed:.2f}s with {bytes_read} bytes (prompt not required)")
                         break
                     
                     # If we have data but still waiting for prompt
                     if output:
                         if elapsed > max_wait:
-                            logger.warning(f"⚠ Timeout after {elapsed:.2f}s with {bytes_read} bytes, returning what we have")
                             break
-                        # Continue waiting for more data/prompt
-                        logger.debug(f"Waiting for prompt at {elapsed:.2f}s ({bytes_read} bytes)...")
                         continue
                     
                     # No data and no prompt yet
                     if elapsed > max_wait:
                         raise ConnectionError(f"No response from server within {max_wait}s")
-                    logger.debug(f"Still waiting at {elapsed:.2f}s...")
                     continue
-                        
+                         
         except asyncio.TimeoutError:
-            logger.error(f"✗ Timeout after {max_wait}s with {bytes_read} bytes")
             if not output:
                 raise ConnectionError(f"No response from server within {max_wait}s")
 
         decoded = output.decode(errors="replace").strip()
-        logger.info(f"✓ Read: {bytes_read} bytes, {len(decoded)} chars")
         return decoded
-
-    def _check_event_loop_mismatch(self) -> bool:
-        """Check if current event loop differs from connection loop.
-        
-        Returns:
-            True if there's a mismatch, False if loops match or connection is uninitialized.
-        """
-        if self._connection_loop is None or self.writer is None:
-            return False
-        
-        try:
-            current_loop = asyncio.get_event_loop()
-            # Check if the loops are different
-            if current_loop != self._connection_loop:
-                logger.debug(f"⚠ Event loop mismatch detected")
-                return True
-        except RuntimeError:
-            # No running event loop - this shouldn't happen but handle it
-            logger.debug("No running event loop")
-            return False
-        
-        return False
 
     async def send_command(self, command: str) -> str:
         """Send a command and get the response.
@@ -329,35 +251,21 @@ class BGPTelnetClient:
         if not self.writer:
             raise ConnectionError("Not connected")
         
-        # Check if event loop has changed since connection was created
-        if self._check_event_loop_mismatch():
-            logger.info(f"ℹ Event loop changed, clearing connection for lazy re-establishment")
-            # Don't close - just mark as disconnected so session manager will reconnect
-            self.reader = None
-            self.writer = None
-            self._connection_loop = None
-            raise ConnectionError("Event loop changed - reconnecting")
-
         try:
-            logger.info(f"Executing command: {command}")
             await self._send_command(command)
             response = await self._read_until_prompt(max_wait=self.timeout)
-            logger.info(f"✓ Command completed")
             return response
         except Exception as e:
-            logger.error(f"✗ Command failed: {str(e)}", exc_info=True)
             raise
 
     async def close(self) -> None:
         """Close the connection."""
         if self.writer:
             try:
-                logger.debug("Closing connection...")
                 self.writer.close()
                 await self.writer.wait_closed()
-                logger.info(f"✓ Disconnected from {self.host}")
             except Exception as e:
-                logger.warning(f"⚠ Error closing connection: {e}")
+                pass
 
     async def __aenter__(self):
         """Async context manager entry."""
@@ -369,3 +277,207 @@ class BGPTelnetClient:
         await self.close()
 
 
+def validate_ip_or_cidr(destination: str) -> tuple[bool, str]:
+    """Validate if destination is a valid public IPv4/IPv6 address or CIDR subnet.
+
+    Args:
+        destination: IP address, IPv6 address, or CIDR notation string.
+
+    Returns:
+        Tuple of (is_valid, message).
+    """
+    destination = destination.strip()
+
+    try:
+        # Try to parse as CIDR subnet first
+        if "/" in destination:
+            network = ipaddress.ip_network(destination, strict=False)
+            
+            # Check if it's a public address (not private/reserved)
+            if network.is_private or network.is_loopback or network.is_link_local:
+                return False, f"CIDR subnet {destination} is not public"
+            
+            return True, f"Valid CIDR subnet: {network}"
+        
+        # Try to parse as individual IP address
+        ip = ipaddress.ip_address(destination)
+        
+        # Check if it's a public address
+        if ip.is_private or ip.is_loopback or ip.is_link_local:
+            return False, f"Address {destination} is not public"
+        
+        return True, f"Valid IP address: {ip}"
+    
+    except ValueError as e:
+        return False, f"Invalid IP address or CIDR notation: {str(e)}"
+
+
+def get_ip_type(destination: str) -> str:
+    """Determine if address is IPv4 or IPv6.
+
+    Args:
+        destination: IP address or CIDR notation.
+
+    Returns:
+        "IPv4", "IPv6", or "unknown".
+    """
+    try:
+        if "/" in destination:
+            network = ipaddress.ip_network(destination, strict=False)
+            return "IPv6" if network.version == 6 else "IPv4"
+        
+        ip = ipaddress.ip_address(destination)
+        return "IPv6" if ip.version == 6 else "IPv4"
+    except ValueError:
+        return "unknown"
+
+
+# Global config
+_config: Optional[dict] = None
+_config_path: Optional[Path] = None
+
+
+def _get_config_path() -> Path:
+    """Get the configuration file path."""
+    global _config_path
+    
+    if _config_path is not None:
+        return _config_path
+    
+    # Check environment variable first
+    env_config_path = os.getenv("CONFIG_PATH")
+    if env_config_path:
+        _config_path = Path(env_config_path)
+    else:
+        _config_path = Path(__file__).parent / "config.json"
+    
+    return _config_path
+
+
+def load_config() -> dict:
+    """Load configuration from config.json.
+    
+    Configuration can be overridden with environment variables:
+    - CONFIG_PATH: Path to config.json file
+    - BGP_SERVER_TIMEOUT: Default timeout for BGP connections (seconds)
+    """
+    global _config
+    
+    if _config is not None:
+        return _config
+    
+    config_path = _get_config_path()
+    
+    try:
+        with open(config_path, "r") as f:
+            _config = json.load(f)
+        
+        # Apply environment variable overrides for server configuration
+        timeout_override = os.getenv("BGP_SERVER_TIMEOUT")
+        if timeout_override:
+            try:
+                timeout = int(timeout_override)
+                for server in _config.get("servers", []):
+                    if "timeout" not in server or server.get("_env_timeout_override"):
+                        server["timeout"] = timeout
+                        server["_env_timeout_override"] = True
+            except ValueError:
+                pass
+        
+        return _config
+    except FileNotFoundError:
+        raise
+    except json.JSONDecodeError as e:
+        raise
+
+
+def get_server_config(server_name: str) -> Optional[dict]:
+    """Get configuration for a specific server.
+
+    Args:
+        server_name: Name of the server.
+
+    Returns:
+        Server configuration dict or None if not found.
+    """
+    config_data = load_config()
+    for server in config_data.get("servers", []):
+        if server.get("name") == server_name:
+            return server
+    return None
+
+
+def get_available_servers() -> list:
+    """Get list of available (enabled) server names from config.
+
+    Returns:
+        List of enabled server names.
+    """
+    config_data = load_config()
+    return [
+        server.get("name")
+        for server in config_data.get("servers", [])
+        if server.get("enabled", True)
+    ]
+
+
+def build_server_description() -> str:
+    """Build a formatted description of available servers for tool docs.
+
+    Returns:
+        Formatted string describing available servers.
+    """
+    servers = get_available_servers()
+    if not servers:
+        return "No servers available."
+    
+    desc = "Available servers: " + ", ".join(servers)
+    desc += f". Default: '{servers[0]}' (fastest)."
+    return desc
+
+
+async def execute_bgp_command(server_name: str, command: str) -> str:
+    """Execute a command on a BGP looking-glass server.
+
+    Args:
+        server_name: Name of the server to query.
+        command: BGP command to execute.
+
+    Returns:
+        Server response with command output.
+    
+    Raises:
+        ValueError: If server not found or disabled.
+        RuntimeError: If connection or command execution fails.
+    """
+    server_config = get_server_config(server_name)
+    if not server_config:
+        raise ValueError(f"Server '{server_name}' not found in configuration")
+
+    if not server_config.get("enabled", True):
+        raise ValueError(f"Server '{server_name}' is disabled")
+
+    try:
+        # Create on-demand connection (fast enough for RouteViews servers)
+        client = TelnetClient(
+            host=server_config["host"],
+            port=server_config.get("port", 23),
+            username=server_config.get("username", ""),
+            password=server_config.get("password", ""),
+            prompt=server_config.get("prompt", "#"),
+            timeout=server_config.get("timeout", 15),
+        )
+        
+        # Connect
+        await client.connect()
+        
+        # Execute command
+        response = await client.send_command(command)
+        
+        # Close connection
+        await client.close()
+        
+        return response
+        
+    except Exception as e:
+        raise RuntimeError(f"Failed to query {server_name}: {str(e)}")
