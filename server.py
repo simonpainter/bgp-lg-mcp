@@ -293,6 +293,7 @@ def run_http_server(
     """
     import uvicorn
     from fastapi import FastAPI, HTTPException
+    from pydantic import ValidationError as PydanticValidationError
 
     app = FastAPI(title="BGP Looking Glass MCP Server")
 
@@ -302,8 +303,20 @@ def run_http_server(
         return {"status": "ok"}
 
     @app.post("/route-lookup", response_model=RouteLookupResponse)
-    async def api_route_lookup(request: RouteLookupRequest):
+    async def api_route_lookup(destination: str, server: str = "RouteViews Linx"):
         """HTTP endpoint for route lookup."""
+        # Validate using Pydantic model
+        try:
+            request = RouteLookupRequest(destination=destination, server=server)
+        except PydanticValidationError as e:
+            errors = e.errors()
+            if errors:
+                field = errors[0].get("loc", ("input",))[0]
+                msg = errors[0]["msg"].removeprefix("Value error, ")
+            else:
+                field, msg = "input", "Invalid input"
+            raise HTTPException(status_code=400, detail=f"Invalid {field}: {msg}")
+
         try:
             result = await query_bgp_server(request.server, request.destination)
             return RouteLookupResponse(
