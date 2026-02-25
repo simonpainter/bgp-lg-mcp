@@ -82,6 +82,6 @@ When adding new features, write tests consistent with standard `pytest` patterns
 ## Key Constraints
 
 - **Telnet only** — only telnet connections are currently supported; no SSH
-- **Public IPs only** — private/reserved ranges are blocked in `validation.py`
+- **Public IPs only** — private, loopback, and link-local ranges are blocked in `validation.py`
 - **No persistent sessions** — each tool call opens and closes a fresh telnet connection
 - **Config-driven** — all server parameters live in `config.json`; avoid hard-coding hostnames or credentials in source files
