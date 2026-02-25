@@ -66,6 +66,8 @@ class ServerInfo(BaseModel):
     port: int
     connection_method: str
     enabled: bool
+    supports_ping: bool = Field(default=False, description="Whether this server supports ping commands")
+    supports_traceroute: bool = Field(default=False, description="Whether this server supports traceroute commands")
 
 
 class ListServersResponse(BaseModel):

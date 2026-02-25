@@ -169,7 +169,9 @@ def list_servers(format: str = "text") -> str:
                     host=server['host'],
                     port=server.get('port', 23),
                     connection_method=server.get('connection_method', 'unknown'),
-                    enabled=server.get('enabled', True)
+                    enabled=server.get('enabled', True),
+                    supports_ping=server.get('supports_ping', False),
+                    supports_traceroute=server.get('supports_traceroute', False)
                 )
                 for server in servers
             ]
@@ -183,6 +185,12 @@ def list_servers(format: str = "text") -> str:
             output += f"\n- {server['name']} ({status})\n"
             output += f"  Host: {server['host']}:{server.get('port', 23)}\n"
             output += f"  Method: {server.get('connection_method', 'unknown')}\n"
+            
+            # Show ping and traceroute capabilities
+            ping_support = "✓ yes" if server.get('supports_ping', False) else "✗ no"
+            trace_support = "✓ yes" if server.get('supports_traceroute', False) else "✗ no"
+            output += f"  Ping: {ping_support}\n"
+            output += f"  Traceroute: {trace_support}\n"
         
         return output
     except Exception as e:
