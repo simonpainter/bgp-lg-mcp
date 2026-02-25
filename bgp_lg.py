@@ -10,6 +10,8 @@ from typing import Optional
 
 import httpx
 
+from models import RouteLookupResponse, BGPSummaryResponse, BGPRoute
+
 # Telnet protocol constants
 TELNET_IAC = 0xff  # Interpret As Command
 TELNET_DONT = 0xfe
@@ -645,9 +647,106 @@ async def lookup_asn_owner(asn_input: str, timeout: int = 10) -> str:
         raise RuntimeError("BGPKit API returned invalid JSON")
 
 
+# BGP Output Parsing Functions
+
+def _parse_bgp_route_lookup(output: str) -> RouteLookupResponse:
+    """Parse 'show ip bgp <destination>' output to structured JSON.
+    
+    Args:
+        output: Raw BGP route lookup output from telnet server
+        
+    Returns:
+        RouteLookupResponse Pydantic model with parsed route information
+    """
+    routes: list[BGPRoute] = []
+    lines = output.split('\n')
+    
+    # Simple parsing of common BGP output format
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith('*'):
+            continue
+        
+        # Look for BGP route lines (typically start with ">", "i", or similar)
+        if re.match(r'^[>i*+\-#]?\s*\d+\.\d+\.\d+\.\d+', line):
+            # Extract prefix if present
+            parts = line.split()
+            if parts:
+                prefix = parts[0] if not parts[0] in ['>', 'i', '*', '+', '-', '#'] else (parts[1] if len(parts) > 1 else None)
+                routes.append(BGPRoute(prefix=prefix))
+    
+    parse_status = "success" if routes else "no_routes_found"
+    
+    return RouteLookupResponse(
+        raw_output=output,
+        parsed_routes=routes,
+        parse_status=parse_status
+    )
+
+
+def _parse_bgp_summary(output: str) -> BGPSummaryResponse:
+    """Parse 'show ip bgp summary' output to structured JSON.
+    
+    Args:
+        output: Raw BGP summary output from telnet server
+        
+    Returns:
+        BGPSummaryResponse Pydantic model with parsed summary information
+    """
+    router_id: Optional[str] = None
+    local_as: Optional[int] = None
+    neighbor_count = 0
+    established_count = 0
+    neighbors: list[dict] = []
+    
+    lines = output.split('\n')
+    
+    # Parse BGP router info
+    for line in lines:
+        line = line.strip()
+        
+        # Look for Router ID line
+        if 'Router ID:' in line or 'BGP router identifier' in line:
+            parts = line.split()
+            for i, part in enumerate(parts):
+                if part in ['ID:', 'identifier']:
+                    if i + 1 < len(parts):
+                        router_id = parts[i + 1]
+        
+        # Look for local AS
+        if 'local AS number' in line or 'Local AS Number' in line:
+            parts = line.split()
+            for i, part in enumerate(parts):
+                if part == 'AS' or 'AS' in part:
+                    if i + 1 < len(parts):
+                        try:
+                            local_as = int(parts[i + 1])
+                        except ValueError:
+                            pass
+        
+        # Look for neighbor count indicators
+        if 'neighbor' in line.lower() or 'peer' in line.lower():
+            # Try to extract numbers from lines mentioning neighbors
+            numbers = re.findall(r'\d+', line)
+            if numbers:
+                neighbor_count = max(neighbor_count, int(numbers[-1]))
+    
+    parse_status = "success" if router_id else "partial"
+    
+    return BGPSummaryResponse(
+        raw_output=output,
+        router_id=router_id,
+        local_as=local_as,
+        neighbor_count=neighbor_count,
+        established_count=established_count,
+        neighbors=neighbors,
+        parse_status=parse_status
+    )
+
+
 async def lookup_ip_geolocation(ip_input: str, timeout: int = 10) -> dict:
     """Look up geolocation and BGP metadata for an IP address using BGPKit API.
-
+    
     Args:
         ip_input: IPv4 or IPv6 address (e.g., "8.8.8.8" or "2001:4860:4860::8888")
         timeout: Request timeout in seconds
@@ -707,4 +806,5 @@ async def lookup_ip_geolocation(ip_input: str, timeout: int = 10) -> dict:
         raise RuntimeError(f"BGPKit API request failed: {str(e)}")
     except json.JSONDecodeError:
         raise RuntimeError("BGPKit API returned invalid JSON")
+
 

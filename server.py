@@ -1,5 +1,6 @@
 """BGP Looking Glass MCP Server."""
 
+import json
 import os
 import sys
 
@@ -13,7 +14,19 @@ from bgp_lg import (
     execute_bgp_command,
     lookup_asn_owner,
     lookup_ip_geolocation,
+    _parse_bgp_route_lookup,
+    _parse_bgp_summary,
 )
+from models import (
+    ErrorResponse,
+    RouteLookupResponse,
+    BGPSummaryResponse,
+    ASNOwnerResponse,
+    IPLookupResponse,
+    ListServersResponse,
+    ServerInfo,
+)
+
 
 
 # Create the MCP server
@@ -21,38 +34,61 @@ mcp = FastMCP("BGP Looking Glass")
 
 
 @mcp.tool()
-async def route_lookup(destination: str, server: str = "RouteViews Linx") -> str:
+async def route_lookup(destination: str, server: str = "RouteViews Linx", format: str = "text") -> str:
     """Look up a route on a BGP looking-glass server.
 
     Args:
         destination: IPv4/IPv6 address or CIDR subnet (e.g., 1.1.1.1 or 1.1.1.0/24).
         server: Name of the BGP server to query (defaults to RouteViews Linx).
                 Call list_servers() to see all available servers and their response times.
+        format: Response format - "text" (default) or "json" for structured output.
 
     Returns:
-        Route lookup results from the BGP server.
+        Route lookup results from the BGP server (text or JSON format).
     """
     # Validate destination
     is_valid, message = validate_ip_or_cidr(destination)
     if not is_valid:
+        error = ErrorResponse(error=message)
+        if format.lower() == "json":
+            return error.model_dump_json(indent=2)
         return f"Error: {message}"
 
     try:
         command = f"show ip bgp {destination}"
         response = await execute_bgp_command(server, command)
+        
+        # Return JSON format if requested
+        if format.lower() == "json":
+            parsed: RouteLookupResponse = _parse_bgp_route_lookup(response)
+            return parsed.model_dump_json(indent=2)
+        
         return response
     except ValueError as e:
+        error = ErrorResponse(error=f"Configuration error: {str(e)}")
+        if format.lower() == "json":
+            return error.model_dump_json(indent=2)
         return f"Configuration error: {str(e)}"
     except ConnectionError as e:
-        return f"Connection error: {str(e)} - The BGP server may be unreachable or not accepting connections"
+        error_msg = f"Connection error: {str(e)} - The BGP server may be unreachable or not accepting connections"
+        error = ErrorResponse(error=error_msg)
+        if format.lower() == "json":
+            return error.model_dump_json(indent=2)
+        return error_msg
     except RuntimeError as e:
+        error = ErrorResponse(error=f"Query error: {str(e)}")
+        if format.lower() == "json":
+            return error.model_dump_json(indent=2)
         return f"Query error: {str(e)}"
     except Exception as e:
+        error = ErrorResponse(error=f"Unexpected error: {type(e).__name__}: {str(e)}")
+        if format.lower() == "json":
+            return error.model_dump_json(indent=2)
         return f"Unexpected error: {type(e).__name__}: {str(e)}"
 
 
 @mcp.tool()
-async def bgp_summary(server: str = "RouteViews Linx") -> str:
+async def bgp_summary(server: str = "RouteViews Linx", format: str = "text") -> str:
     """Get BGP summary information from a route server.
 
     Returns information about the BGP router including neighbor counts, 
@@ -61,6 +97,7 @@ async def bgp_summary(server: str = "RouteViews Linx") -> str:
     Args:
         server: Name of the BGP server to query (defaults to RouteViews Linx).
                 Call list_servers() to see all available servers and their response times.
+        format: Response format - "text" (default) or "json" for structured output.
 
     Returns:
         BGP summary output from the server showing router statistics and neighbors.
@@ -68,20 +105,43 @@ async def bgp_summary(server: str = "RouteViews Linx") -> str:
     try:
         command = "show ip bgp summary"
         response = await execute_bgp_command(server, command)
+        
+        # Return JSON format if requested
+        if format.lower() == "json":
+            parsed: BGPSummaryResponse = _parse_bgp_summary(response)
+            return parsed.model_dump_json(indent=2)
+        
         return response        
     except ValueError as e:
+        error = ErrorResponse(error=f"Configuration error: {str(e)}")
+        if format.lower() == "json":
+            return error.model_dump_json(indent=2)
         return f"Configuration error: {str(e)}"
     except ConnectionError as e:
-        return f"Connection error: {str(e)} - The BGP server may be unreachable or not accepting connections"
+        error_msg = f"Connection error: {str(e)} - The BGP server may be unreachable or not accepting connections"
+        error = ErrorResponse(error=error_msg)
+        if format.lower() == "json":
+            return error.model_dump_json(indent=2)
+        return error_msg
     except RuntimeError as e:
+        error = ErrorResponse(error=f"Query error: {str(e)}")
+        if format.lower() == "json":
+            return error.model_dump_json(indent=2)
         return f"Query error: {str(e)}"
     except Exception as e:
+        error = ErrorResponse(error=f"Unexpected error: {type(e).__name__}: {str(e)}")
+        if format.lower() == "json":
+            return error.model_dump_json(indent=2)
         return f"Unexpected error: {type(e).__name__}: {str(e)}"
 
 
 @mcp.tool()
-def list_servers() -> str:
+@mcp.tool()
+def list_servers(format: str = "text") -> str:
     """List all configured BGP looking-glass servers.
+
+    Args:
+        format: Response format - "text" (default) or "json" for structured output.
 
     Returns:
         List of configured servers with their details.
@@ -91,8 +151,26 @@ def list_servers() -> str:
         servers = config_data.get("servers", [])
         
         if not servers:
+            if format.lower() == "json":
+                response = ListServersResponse(servers=[])
+                return response.model_dump_json(indent=2)
             return "No servers configured."
         
+        if format.lower() == "json":
+            server_infos = [
+                ServerInfo(
+                    name=server['name'],
+                    host=server['host'],
+                    port=server.get('port', 23),
+                    connection_method=server.get('connection_method', 'unknown'),
+                    enabled=server.get('enabled', True)
+                )
+                for server in servers
+            ]
+            response = ListServersResponse(servers=server_infos)
+            return response.model_dump_json(indent=2)
+        
+        # Text format
         output = "Configured BGP Looking-Glass Servers:\n"
         for server in servers:
             status = "enabled" if server.get("enabled", True) else "disabled"
@@ -102,34 +180,52 @@ def list_servers() -> str:
         
         return output
     except Exception as e:
+        error = ErrorResponse(error=f"Error listing servers: {str(e)}")
+        if format.lower() == "json":
+            return error.model_dump_json(indent=2)
         return f"Error listing servers: {str(e)}"
 
 
 @mcp.tool()
-async def asn_owner(asn: str) -> str:
+async def asn_owner(asn: str, format: str = "text") -> str:
     """Look up the owner name for an Autonomous System Number (ASN).
 
     Uses the BGPKit public API to retrieve ASN ownership information.
 
     Args:
         asn: Autonomous System Number in format "AS123" or "123" (e.g., "AS64512" or "64512").
+        format: Response format - "text" (default) or "json" for structured output.
 
     Returns:
-        Owner name for the ASN.
+        Owner name for the ASN (text or JSON format).
     """
     try:
         owner_name = await lookup_asn_owner(asn)
+        
+        if format.lower() == "json":
+            response: ASNOwnerResponse = ASNOwnerResponse(asn=asn, owner=owner_name)
+            return response.model_dump_json(indent=2)
+        
         return f"ASN {asn}: {owner_name}"
     except ValueError as e:
+        error = ErrorResponse(error=f"Invalid ASN: {str(e)}")
+        if format.lower() == "json":
+            return error.model_dump_json(indent=2)
         return f"Invalid ASN: {str(e)}"
     except RuntimeError as e:
+        error = ErrorResponse(error=f"Lookup error: {str(e)}")
+        if format.lower() == "json":
+            return error.model_dump_json(indent=2)
         return f"Lookup error: {str(e)}"
     except Exception as e:
+        error = ErrorResponse(error=f"Unexpected error: {type(e).__name__}: {str(e)}")
+        if format.lower() == "json":
+            return error.model_dump_json(indent=2)
         return f"Unexpected error: {type(e).__name__}: {str(e)}"
 
 
 @mcp.tool()
-async def ip_lookup(ip: str) -> str:
+async def ip_lookup(ip: str, format: str = "text") -> str:
     """Look up geolocation and BGP metadata for an IP address.
 
     Uses the BGPKit public API to retrieve IP geolocation information including
@@ -138,6 +234,7 @@ async def ip_lookup(ip: str) -> str:
     Args:
         ip: IPv4 or IPv6 address (e.g., "8.8.8.8" or "2001:4860:4860::8888").
             Must be a public address (not private or reserved).
+        format: Response format - "text" (default) or "json" for structured output.
 
     Returns:
         Dictionary-formatted string with: ip, country, asn, prefix, name, rpki, updated_at
@@ -145,7 +242,11 @@ async def ip_lookup(ip: str) -> str:
     try:
         result = await lookup_ip_geolocation(ip)
         
-        # Format response
+        if format.lower() == "json":
+            response: IPLookupResponse = IPLookupResponse(**result)
+            return response.model_dump_json(indent=2)
+        
+        # Format response as text
         output = f"IP Lookup: {result['ip']}\n"
         output += f"Country: {result['country']}\n"
         output += f"ASN: {result['asn']}\n"
@@ -156,10 +257,19 @@ async def ip_lookup(ip: str) -> str:
         
         return output
     except ValueError as e:
+        error = ErrorResponse(error=f"Invalid IP address: {str(e)}")
+        if format.lower() == "json":
+            return error.model_dump_json(indent=2)
         return f"Invalid IP address: {str(e)}"
     except RuntimeError as e:
+        error = ErrorResponse(error=f"Lookup error: {str(e)}")
+        if format.lower() == "json":
+            return error.model_dump_json(indent=2)
         return f"Lookup error: {str(e)}"
     except Exception as e:
+        error = ErrorResponse(error=f"Unexpected error: {type(e).__name__}: {str(e)}")
+        if format.lower() == "json":
+            return error.model_dump_json(indent=2)
         return f"Unexpected error: {type(e).__name__}: {str(e)}"
 
 

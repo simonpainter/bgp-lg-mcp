@@ -59,6 +59,46 @@ The BGP Looking Glass tools will appear in your MCP tools list. Start asking abo
 
 ## Available Tools
 
+### JSON Response Format
+
+All tools support both **text** (default) and **JSON** response formats for flexibility in how you consume data.
+
+**Using JSON format:**
+
+```python
+# Get structured JSON instead of text
+route_lookup(destination="8.8.8.0/24", format="json")
+bgp_summary(format="json")
+asn_owner(asn="AS15169", format="json")
+ip_lookup(ip="8.8.8.8", format="json")
+list_servers(format="json")
+```
+
+**Benefits of JSON format:**
+
+- **Programmatic parsing** - Easy to parse and process structured data
+- **Type safety** - Pydantic models validate all responses
+- **Consistent structure** - All tools follow the same JSON schema
+- **Error handling** - Errors also return structured JSON
+- **API integration** - Better for building on top of the MCP server
+
+**Example JSON response:**
+
+```json
+{
+  "type": "ip_lookup",
+  "ip": "8.8.8.8",
+  "country": "US",
+  "asn": 15169,
+  "prefix": "8.8.8.0/24",
+  "name": "Google, YouTube (for Google Fiber see AS16591 record)",
+  "rpki": "valid",
+  "updated_at": "2026-02-25T10:00:00"
+}
+```
+
+---
+
 ### `route_lookup` - Query BGP Routes
 
 Look up how a specific IP address or subnet would be routed.
@@ -67,14 +107,16 @@ Look up how a specific IP address or subnet would be routed.
 
 - `destination` - IPv4/IPv6 address or CIDR subnet (e.g., `8.8.8.0/24`)
 - `server` - Which route server to query (default: RouteViews Linx)
+- `format` - Response format: `text` (default) or `json`
 
-**Returns:** Raw BGP lookup output including matching routes, AS paths, next-hop information, and route attributes.
+**Returns:** Raw BGP lookup output including matching routes, AS paths, next-hop information, and route attributes (or structured JSON if format="json").
 
 **Example:**
 
 ```python
 route_lookup(destination="1.1.1.1")
 route_lookup(destination="2001:4860:4860::8888", server="RouteViews Sydney")
+route_lookup(destination="8.8.8.0/24", format="json")
 ```
 
 ---
@@ -86,6 +128,7 @@ Retrieve BGP summary information from a route server.
 **Parameters:**
 
 - `server` - Which route server to query (default: RouteViews Linx)
+- `format` - Response format: `text` (default) or `json`
 
 **Returns:** BGP summary output showing:
 
@@ -99,6 +142,7 @@ Retrieve BGP summary information from a route server.
 ```python
 bgp_summary()
 bgp_summary(server="RouteViews Equinix")
+bgp_summary(format="json")
 ```
 
 **Use cases:**
@@ -113,12 +157,17 @@ bgp_summary(server="RouteViews Equinix")
 
 Display all configured BGP looking-glass servers.
 
+**Parameters:**
+
+- `format` - Response format: `text` (default) or `json`
+
 **Returns:** Server names, status (enabled/disabled), hostnames, and connection method.
 
 **Example:**
 
 ```python
 list_servers()
+list_servers(format="json")
 ```
 
 ---
@@ -130,6 +179,7 @@ Retrieve the owner name for an Autonomous System Number (ASN) using BGPKit API.
 **Parameters:**
 
 - `asn` - Autonomous System Number in format "AS123" or "123" (e.g., "AS15169", "64512")
+- `format` - Response format: `text` (default) or `json`
 
 **Returns:** Owner name for the ASN.
 
@@ -139,6 +189,17 @@ Retrieve the owner name for an Autonomous System Number (ASN) using BGPKit API.
 asn_owner(asn="AS15169")
 asn_owner(asn="15169")
 asn_owner(asn="AS64512")
+asn_owner(asn="AS15169", format="json")
+```
+
+**JSON Example Response:**
+
+```json
+{
+  "type": "asn_owner",
+  "asn": "AS15169",
+  "owner": "GOOGLE - Google LLC"
+}
 ```
 
 **Use cases:**
@@ -157,6 +218,7 @@ Look up geolocation information and BGP metadata for an IP address using BGPKit 
 
 - `ip` - IPv4 or IPv6 address (e.g., `8.8.8.8` or `2001:4860:4860::8888`)
   - Must be a public address (private/reserved addresses are rejected for safety)
+- `format` - Response format: `text` (default) or `json`
 
 **Returns:** IP geolocation data including:
 
@@ -173,9 +235,10 @@ Look up geolocation information and BGP metadata for an IP address using BGPKit 
 ip_lookup(ip="8.8.8.8")
 ip_lookup(ip="1.1.1.1")
 ip_lookup(ip="2001:4860:4860::8888")
+ip_lookup(ip="8.8.8.8", format="json")
 ```
 
-**Example Output:**
+**Text Output Example:**
 
 ```
 IP Lookup: 8.8.8.8
@@ -185,6 +248,21 @@ Prefix: 8.8.8.0/24
 Name: Google, YouTube (for Google Fiber see AS16591 record)
 RPKI Status: valid
 Updated: 2026-02-25T10:00:00
+```
+
+**JSON Output Example:**
+
+```json
+{
+  "type": "ip_lookup",
+  "ip": "8.8.8.8",
+  "country": "US",
+  "asn": 15169,
+  "prefix": "8.8.8.0/24",
+  "name": "Google, YouTube (for Google Fiber see AS16591 record)",
+  "rpki": "valid",
+  "updated_at": "2026-02-25T10:00:00"
+}
 ```
 
 **Use cases:**
