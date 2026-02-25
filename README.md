@@ -335,9 +335,9 @@ Round-trip times (ms): min=10.5, avg=11.2, max=12.3
 
 **Supported Servers:**
 
-- RouteViews Linx ✅
 - RouteViews Main ✅
-- RouteViews 2 ✅
+- RouteViews Linx ❌ (command not available)
+- RouteViews 2 ❌ (command not available)
 - Other servers ❌ (limited access)
 
 **Use cases:**
@@ -433,9 +433,9 @@ Total hops: 12
 
 **Supported Servers:**
 
-- RouteViews Linx ✅
 - RouteViews Main ✅
-- RouteViews 2 ✅
+- RouteViews Linx ❌ (command not available)
+- RouteViews 2 ❌ (command not available)
 - Other servers ❌ (limited access)
 
 **Understanding Traceroute Output:**

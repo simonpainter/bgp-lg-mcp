@@ -10,8 +10,8 @@
       "prompt": ">",
       "timeout": 15,
       "enabled": true,
-      "supports_ping": true,
-      "supports_traceroute": true
+      "supports_ping": false,
+      "supports_traceroute": false
     },
     {
       "name": "RouteViews Main",
@@ -36,8 +36,8 @@
       "prompt": ">",
       "timeout": 15,
       "enabled": true,
-      "supports_ping": true,
-      "supports_traceroute": true
+      "supports_ping": false,
+      "supports_traceroute": false
     },
     {
       "name": "Equinix Ashburn",
