@@ -534,25 +534,17 @@ async def execute_bgp_command(server_name: str, command: str) -> str:
 
     try:
         # Create on-demand connection (fast enough for RouteViews servers)
-        client = TelnetClient(
+        async with TelnetClient(
             host=server_config["host"],
             port=server_config.get("port", 23),
             username=server_config.get("username", ""),
             password=server_config.get("password", ""),
             prompt=server_config.get("prompt", "#"),
             timeout=server_config.get("timeout", 15),
-        )
-        
-        # Connect
-        await client.connect()
-        
-        # Execute command
-        response = await client.send_command(command)
-        
-        # Close connection
-        await client.close()
-        
-        return response
+        ) as client:
+            # Execute command
+            response = await client.send_command(command)
+            return response
         
     except Exception as e:
         raise RuntimeError(f"Failed to query {server_name}: {str(e)}")
@@ -943,6 +935,5 @@ def _parse_traceroute_output(output: str, target_ip: str) -> dict:
     result["total_hops"] = len(result["hops"])
     
     return result
-
 
 
