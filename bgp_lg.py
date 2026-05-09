@@ -124,7 +124,14 @@ async def _http_request_with_retry(
 class TelnetClient:
     """Async telnet client for BGP looking-glass servers."""
 
-    _AUTH_FAILURE_KEYWORDS = ("login incorrect", "authentication failed")
+    _AUTH_FAILURE_KEYWORDS = (
+        "login incorrect",
+        "authentication failed",
+        "access denied",
+        "invalid password",
+        "invalid credentials",
+        "permission denied",
+    )
 
     def __init__(
         self,
