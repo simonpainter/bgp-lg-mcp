@@ -269,6 +269,8 @@ async def ping_host(ip: str, server: str = "RouteViews Linx", format: str = "tex
     is_valid, message = validate_ip_or_cidr(ip)
     if not is_valid:
         return _error_response(f"Error: {message}", format)
+    if "/" in ip:
+        return _error_response("Error: CIDR notation is not allowed for ping. Please provide a single host IP address.", format)
 
     try:
         # Get server config to check if server exists and supports ping
@@ -345,6 +347,8 @@ async def traceroute_host(ip: str, server: str = "RouteViews Linx", format: str 
     is_valid, message = validate_ip_or_cidr(ip)
     if not is_valid:
         return _error_response(f"Error: {message}", format)
+    if "/" in ip:
+        return _error_response("Error: CIDR notation is not allowed for traceroute. Please provide a single host IP address.", format)
 
     try:
         # Get server config to check if server exists and supports traceroute
