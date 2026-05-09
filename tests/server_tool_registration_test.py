@@ -1,10 +1,20 @@
 import ast
+import inspect
 from pathlib import Path
+
+import pytest
+import server
 
 
 def test_list_servers_has_single_mcp_tool_decorator():
-    server_path = Path(__file__).resolve().parents[1] / "server.py"
-    module = ast.parse(server_path.read_text())
+    server_file = inspect.getsourcefile(server)
+    assert server_file is not None, "Unable to resolve server.py location from imported server module"
+    server_path = Path(server_file)
+    assert server_path.exists(), f"Resolved server.py path does not exist: {server_path}"
+    try:
+        module = ast.parse(server_path.read_text())
+    except SyntaxError as exc:
+        pytest.fail(f"Unable to parse {server_path}: {exc}")
 
     list_servers = next(
         (node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == "list_servers"),
