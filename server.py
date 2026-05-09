@@ -110,6 +110,10 @@ async def bgp_summary(server: str = "RouteViews Linx", format: str = "text") -> 
         BGP summary output from the server showing router statistics and neighbors.
     """
     try:
+        server_info = get_server_config(server)
+        if not server_info:
+            raise ValueError(f"Server '{server}' not found. Call list_servers() to see available servers.")
+
         command = "show ip bgp summary"
         response = await execute_bgp_command(server, command)
         
@@ -142,7 +146,6 @@ async def bgp_summary(server: str = "RouteViews Linx", format: str = "text") -> 
         return f"Unexpected error: {type(e).__name__}: {str(e)}"
 
 
-@mcp.tool()
 @mcp.tool()
 def list_servers(format: str = "text") -> str:
     """List all configured BGP looking-glass servers.
