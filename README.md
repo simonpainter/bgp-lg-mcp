@@ -6,7 +6,7 @@ Query live BGP routing information, ping IP addresses, and trace network paths f
 
 A **BGP Looking Glass** is an internet-accessible service that exposes BGP (Border Gateway Protocol) routing data. BGP is the protocol that powers the internet's routing infrastructure. Looking glasses let you see what routes a particular BGP speaker has learned and how it would route traffic to a given destination.
 
-This project wraps 7 public RouteViews servers into an **MCP (Model Context Protocol) server**, making BGP queries, ping, and traceroute available to Claude Desktop and other AI assistants. Now you can ask Claude about internet routing with live, authoritative data.
+This project wraps 13 public RouteViews servers into an **MCP (Model Context Protocol) server**, making BGP queries, ping, and traceroute available to Claude Desktop and other AI assistants. Now you can ask Claude about internet routing with live, authoritative data.
 
 **Example questions Claude can answer:**
 
@@ -21,7 +21,7 @@ This project wraps 7 public RouteViews servers into an **MCP (Model Context Prot
 
 ## Features
 
-- **Query live BGP routes** from 7 globally-distributed public route servers
+- **Query live BGP routes** from 13 globally-distributed public route servers
 - **Ping IP addresses** from route servers to test connectivity and measure latency
 - **Trace routes** to IP addresses to see the network path and identify which ASes are involved
 - **Look up IP geolocation & BGP metadata** using BGPKit public API
@@ -119,7 +119,7 @@ Look up how a specific IP address or subnet would be routed.
 
 ```python
 route_lookup(destination="1.1.1.1")
-route_lookup(destination="2001:4860:4860::8888", server="RouteViews Sydney")
+route_lookup(destination="2001:4860:4860::8888", server="Equinix Sydney")
 route_lookup(destination="8.8.8.0/24", format="json")
 ```
 
@@ -145,7 +145,7 @@ Retrieve BGP summary information from a route server.
 
 ```python
 bgp_summary()
-bgp_summary(server="RouteViews Equinix")
+bgp_summary(server="Equinix Ashburn")
 bgp_summary(format="json")
 ```
 
@@ -372,7 +372,7 @@ Trace the network path (hops) to an IP address from a BGP looking-glass server.
 
 ```python
 traceroute_host(ip="8.8.8.8")
-traceroute_host(ip="1.1.1.1", server="RouteViews Sydney")
+traceroute_host(ip="1.1.1.1", server="Equinix Sydney")
 traceroute_host(ip="2001:4860:4860::8888", format="json")
 ```
 
@@ -458,17 +458,23 @@ Total hops: 12
 
 ## Supported Route Servers
 
-7 globally-distributed public RouteViews servers, all freely accessible:
+13 globally-distributed public RouteViews servers, all freely accessible:
 
-| Server | Location | Response Time | Coverage |
-| -------- | ---------- | --------------- | ---------- |
-| RouteViews Linx | London, UK | ~50ms | ⚡ **Fastest - use by default** |
-| RouteViews Equinix | Multiple locations | ~330ms | Good alternative |
-| RouteViews ISC | Multiple locations | ~530ms | Good alternative |
-| RouteViews Main | Oregon, USA | ~740ms | Largest BGP view |
-| RouteViews WIDE | Tokyo, Japan | ~1.1s | Asia-Pacific coverage |
-| RouteViews Chicago | Chicago, USA | Variable | North America |
-| RouteViews Sydney | Sydney, Australia | Variable | Oceania coverage |
+| Server | Location | supports_ping | supports_traceroute |
+| -------- | ---------- | ------------- | ------------------- |
+| RouteViews Linx | London, UK | false | false |
+| RouteViews Main | Oregon, USA | true | true |
+| RouteViews2 | Oregon, USA | false | false |
+| Equinix Ashburn | Ashburn, USA | false | false |
+| DE-CIX New York | New York, USA | false | false |
+| Equinix Chicago | Chicago, USA | false | false |
+| NWAX Portland | Portland, USA | false | false |
+| AMS-IX Amsterdam | Amsterdam, Netherlands | false | false |
+| Equinix Singapore | Singapore | false | false |
+| HKIX Hong Kong | Hong Kong | false | false |
+| Equinix Sydney | Sydney, Australia | false | false |
+| IX.br São Paulo | São Paulo, Brazil | false | false |
+| RouteViews WIDE | Tokyo, Japan | false | false |
 
 All servers are:
 
@@ -646,7 +652,7 @@ And verify the config path in `claude_desktop_config.json` is correct.
 **Solution:** Try a different server or verify the IP is public:
 
 ```python
-route_lookup(destination="1.1.1.1", server="RouteViews Equinix")
+route_lookup(destination="1.1.1.1", server="Equinix Ashburn")
 ```
 
 ### Server won't start
