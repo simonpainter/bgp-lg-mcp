@@ -7,8 +7,10 @@ def test_list_servers_has_single_mcp_tool_decorator():
     module = ast.parse(server_path.read_text())
 
     list_servers = next(
-        node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == "list_servers"
+        (node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == "list_servers"),
+        None,
     )
+    assert list_servers is not None, "list_servers function not found in server.py"
 
     mcp_tool_decorators = [
         decorator
