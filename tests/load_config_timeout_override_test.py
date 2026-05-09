@@ -21,7 +21,6 @@ def test_env_timeout_override_no_sentinel_pollution(monkeypatch, tmp_path):
     monkeypatch.setenv("BGP_SERVER_TIMEOUT", "20")
     monkeypatch.setattr(bgp_lg, "_config", None)
     monkeypatch.setattr(bgp_lg, "_config_path", None)
-    bgp_lg._env_timeout_override_servers.clear()
 
     config = bgp_lg.load_config()
 
