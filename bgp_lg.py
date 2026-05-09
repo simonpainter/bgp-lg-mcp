@@ -410,6 +410,7 @@ def get_ip_type(destination: str) -> str:
 # Global config
 _config: Optional[dict] = None
 _config_path: Optional[Path] = None
+_env_timeout_override_servers: set[int] = set()
 
 
 def _get_config_path() -> Path:
@@ -448,14 +449,16 @@ def load_config() -> dict:
             _config = json.load(f)
         
         # Apply environment variable overrides for server configuration
+        _env_timeout_override_servers.clear()
         timeout_override = os.getenv("BGP_SERVER_TIMEOUT")
         if timeout_override:
             try:
                 timeout = int(timeout_override)
                 for server in _config.get("servers", []):
-                    if "timeout" not in server or server.get("_env_timeout_override"):
+                    server_id = id(server)
+                    if "timeout" not in server or server_id in _env_timeout_override_servers:
                         server["timeout"] = timeout
-                        server["_env_timeout_override"] = True
+                        _env_timeout_override_servers.add(server_id)
             except ValueError:
                 pass
         
@@ -920,4 +923,3 @@ def _parse_traceroute_output(output: str, target_ip: str) -> dict:
     result["total_hops"] = len(result["hops"])
     
     return result
-
