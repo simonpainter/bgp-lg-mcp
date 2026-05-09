@@ -266,7 +266,7 @@ class TelnetClient:
 
         output = b""
         bytes_read = 0
-        start_time = asyncio.get_event_loop().time()
+        start_time = asyncio.get_running_loop().time()
         read_timeout = 1.0
         had_data = False
         
@@ -313,7 +313,7 @@ class TelnetClient:
                         break
                         
                 except asyncio.TimeoutError:
-                    elapsed = asyncio.get_event_loop().time() - start_time
+                    elapsed = asyncio.get_running_loop().time() - start_time
                     
                     # If we haven't received any data yet, keep waiting
                     if not had_data:
