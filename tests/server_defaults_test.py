@@ -71,3 +71,29 @@ async def test_traceroute_host_uses_routeviews_main_by_default(monkeypatch):
     response = await server.traceroute_host("1.1.1.1")
     assert "Server: RouteViews Main" in response
     assert "Error:" not in response
+
+
+@pytest.mark.asyncio
+async def test_route_lookup_uses_ipv4_bgp_command(monkeypatch):
+    async def fake_execute_bgp_command(server_name, command):
+        assert server_name == "RouteViews Linx"
+        assert command == "show ip bgp 8.8.8.8"
+        return "route output"
+
+    monkeypatch.setattr(server, "execute_bgp_command", fake_execute_bgp_command)
+
+    response = await server.route_lookup("8.8.8.8")
+    assert response == "route output"
+
+
+@pytest.mark.asyncio
+async def test_route_lookup_uses_ipv6_bgp_command(monkeypatch):
+    async def fake_execute_bgp_command(server_name, command):
+        assert server_name == "RouteViews Linx"
+        assert command == "show bgp ipv6 unicast 2001:4860:4860::8888"
+        return "route output"
+
+    monkeypatch.setattr(server, "execute_bgp_command", fake_execute_bgp_command)
+
+    response = await server.route_lookup("2001:4860:4860::8888")
+    assert response == "route output"
