@@ -19,7 +19,7 @@ def test_list_servers_has_single_mcp_tool_decorator():
     list_servers = next(
         (
             node
-            for node in ast.walk(module)
+            for node in module.body
             if isinstance(node, ast.FunctionDef) and node.name == "list_servers"
         ),
         None,
@@ -45,6 +45,6 @@ def test_list_servers_has_single_mcp_tool_decorator():
             mcp_tool_decorators.append(decorator)
 
     assert len(mcp_tool_decorators) == 1, (
-        f"Expected exactly 1 @mcp.tool() decorator on list_servers, "
+        f"Expected exactly 1 @mcp.tool or @mcp.tool() decorator on list_servers, "
         f"but found {len(mcp_tool_decorators)}"
     )
