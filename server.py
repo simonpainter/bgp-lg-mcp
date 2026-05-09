@@ -434,7 +434,8 @@ async def traceroute_host(ip: str, server: str = "RouteViews Main", format: str 
 app = mcp.streamable_http_app()
 
 
-if __name__ == "__main__":
+def run_http_server() -> None:
+    """Run the MCP server using environment and CLI transport settings."""
     # Support environment variables for configuration
     transport_mode = os.getenv("TRANSPORT_MODE", "streamable-http").lower()
     server_host = os.getenv("SERVER_HOST", "127.0.0.1")
@@ -451,3 +452,7 @@ if __name__ == "__main__":
     else:
         # Start an HTTP server (default: streamable-http)
         mcp.run(transport=transport_mode)  # type: ignore
+
+
+if __name__ == "__main__":
+    run_http_server()
