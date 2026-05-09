@@ -3,7 +3,11 @@ import pytest
 import bgp_lg
 
 
-class _FakeWriter:
+class FakeReader:
+    pass
+
+
+class FakeWriter:
     async def drain(self):
         pass
 
@@ -27,7 +31,7 @@ async def test_telnet_client_connect_raises_on_authentication_failure(
     async def fake_open_connection(host, port):
         assert host == "example.com"
         assert port == 23
-        return object(), _FakeWriter()
+        return FakeReader(), FakeWriter()
 
     async def fake_send_command(command):
         sent_commands.append(command)

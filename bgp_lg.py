@@ -250,8 +250,8 @@ class TelnetClient:
 
     def _raise_on_auth_failure(self, response: str) -> None:
         """Raise if the server response indicates authentication failure."""
-        lowered = response.lower()
-        if any(keyword in lowered for keyword in self._AUTH_FAILURE_KEYWORDS):
+        response_lower = response.lower()
+        if any(keyword in response_lower for keyword in self._AUTH_FAILURE_KEYWORDS):
             raise ConnectionError(f"Authentication failed: {response}")
 
     async def _send_command(self, command: str) -> None:
