@@ -22,6 +22,7 @@ async def test_telnet_client_connect_raises_on_authentication_failure(
     client = bgp_lg.TelnetClient("example.com", username="user", password="badpass")
     remaining_responses = iter(responses)
     sent_commands = []
+    read_calls = 0
 
     async def fake_open_connection(host, port):
         assert host == "example.com"
@@ -32,6 +33,14 @@ async def test_telnet_client_connect_raises_on_authentication_failure(
         sent_commands.append(command)
 
     async def fake_read_until_prompt(max_wait=5, require_prompt=True):
+        nonlocal read_calls
+        read_calls += 1
+        if read_calls == 1:
+            assert max_wait == 15
+            assert require_prompt is False
+        else:
+            assert max_wait == client.timeout
+            assert require_prompt is True
         return next(remaining_responses)
 
     monkeypatch.setattr(bgp_lg.asyncio, "open_connection", fake_open_connection)
