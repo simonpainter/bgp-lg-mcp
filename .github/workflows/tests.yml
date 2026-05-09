@@ -27,4 +27,11 @@ jobs:
 
       - name: Run tests
         run: |
-          python -m pytest || [ $? -eq 5 ]
+          set +e
+          python -m pytest
+          status=$?
+          if [ "$status" -eq 5 ]; then
+            echo "No tests were collected."
+            exit 0
+          fi
+          exit "$status"
