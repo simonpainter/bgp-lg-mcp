@@ -30,6 +30,7 @@ jobs:
           set +e
           python -m pytest
           status=$?
+          # Repository currently has no test files; keep CI green until tests are added.
           if [ "$status" -eq 5 ]; then
             echo "No tests were collected."
             exit 0
