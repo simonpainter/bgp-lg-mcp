@@ -10,7 +10,7 @@ This project wraps 7 public RouteViews servers into an **MCP (Model Context Prot
 
 **Example questions Claude can answer:**
 
-- "What's the AS path to 8.8.0/24?"
+- "What's the AS path to 8.8.0.0/24?"
 - "Is this prefix routed?"
 - "How many BGP neighbors does the Linx route server have?"
 - "Who owns AS15169?"
