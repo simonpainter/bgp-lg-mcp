@@ -124,6 +124,13 @@ async def _http_request_with_retry(
 class TelnetClient:
     """Async telnet client for BGP looking-glass servers."""
 
+    _INITIAL_BANNER_WAIT = 15
+    _AUTH_FAILURE_PATTERN = re.compile(
+        r"\b(login incorrect|authentication failed|access denied|"
+        r"invalid password|invalid credentials|permission denied)\b",
+        re.IGNORECASE,
+    )
+
     def __init__(
         self,
         host: str,
@@ -228,21 +235,31 @@ class TelnetClient:
             )
 
             # Read initial banner/prompt
-            banner = await self._read_until_prompt(max_wait=15, require_prompt=False)
+            banner = await self._read_until_prompt(
+                max_wait=self._INITIAL_BANNER_WAIT,
+                require_prompt=False,
+            )
 
             # Authenticate if credentials provided
             if self.username:
                 await self._send_command(self.username)
                 response = await self._read_until_prompt(max_wait=self.timeout)
+                self._raise_on_auth_failure(response)
 
             if self.password:
                 await self._send_command(self.password)
                 response = await self._read_until_prompt(max_wait=self.timeout)
+                self._raise_on_auth_failure(response)
 
         except asyncio.TimeoutError:
             raise ConnectionError(f"Timeout connecting to {self.host}:{self.port}")
         except Exception as e:
             raise ConnectionError(f"Failed to connect to {self.host}: {str(e)}")
+
+    def _raise_on_auth_failure(self, response: str) -> None:
+        """Raise if the server response indicates authentication failure."""
+        if match := self._AUTH_FAILURE_PATTERN.search(response):
+            raise ConnectionError(f"Authentication failed: {match.group(1)}")
 
     async def _send_command(self, command: str) -> None:
         """Send a command to the server."""
