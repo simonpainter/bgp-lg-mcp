@@ -22,6 +22,34 @@ TELNET_SB = 0xfa  # Subnegotiation
 TELNET_SE = 0xf0  # End of subnegotiation
 
 
+def _get_positive_int_env(name: str, default: int) -> int:
+    """Read a positive integer from an environment variable."""
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        parsed = int(value)
+        return parsed if parsed > 0 else default
+    except ValueError:
+        return default
+
+
+GLOBAL_OUTBOUND_MAX_CONCURRENCY = _get_positive_int_env("BGP_GLOBAL_MAX_OUTBOUND", 10)
+PER_SERVER_MAX_CONCURRENCY = _get_positive_int_env("BGP_PER_SERVER_MAX_CONNECTIONS", 2)
+
+_global_outbound_semaphore = asyncio.Semaphore(GLOBAL_OUTBOUND_MAX_CONCURRENCY)
+_per_server_semaphores: dict[str, asyncio.Semaphore] = {}
+_per_server_semaphores_lock = asyncio.Lock()
+
+
+async def _get_per_server_semaphore(server_key: str) -> asyncio.Semaphore:
+    """Get/create per-server semaphore for outbound telnet connections."""
+    async with _per_server_semaphores_lock:
+        if server_key not in _per_server_semaphores:
+            _per_server_semaphores[server_key] = asyncio.Semaphore(PER_SERVER_MAX_CONCURRENCY)
+        return _per_server_semaphores[server_key]
+
+
 async def _http_request_with_retry(
     client: httpx.AsyncClient,
     method: str,
@@ -57,7 +85,8 @@ async def _http_request_with_retry(
     
     for attempt in range(max_retries + 1):
         try:
-            response = await client.request(method, url, **kwargs)
+            async with _global_outbound_semaphore:
+                response = await client.request(method, url, **kwargs)
             
             # Don't retry on 404 or other client errors (except 429)
             if response.status_code == 429:
@@ -521,18 +550,24 @@ async def execute_bgp_command(server_name: str, command: str) -> str:
         raise ValueError(f"Server '{server_name}' is disabled")
 
     try:
-        # Create on-demand connection (fast enough for RouteViews servers)
-        async with TelnetClient(
-            host=server_config["host"],
-            port=server_config.get("port", 23),
-            username=server_config.get("username", ""),
-            password=server_config.get("password", ""),
-            prompt=server_config.get("prompt", "#"),
-            timeout=server_config.get("timeout", 15),
-        ) as client:
-            # Execute command
-            response = await client.send_command(command)
-            return response
+        host = server_config["host"]
+        port = server_config.get("port", 23)
+        server_semaphore = await _get_per_server_semaphore(f"{host}:{port}")
+
+        async with _global_outbound_semaphore:
+            async with server_semaphore:
+                # Create on-demand connection (fast enough for RouteViews servers)
+                async with TelnetClient(
+                    host=host,
+                    port=port,
+                    username=server_config.get("username", ""),
+                    password=server_config.get("password", ""),
+                    prompt=server_config.get("prompt", "#"),
+                    timeout=server_config.get("timeout", 15),
+                ) as client:
+                    # Execute command
+                    response = await client.send_command(command)
+                    return response
         
     except Exception as e:
         raise RuntimeError(f"Failed to query {server_name}: {str(e)}")
