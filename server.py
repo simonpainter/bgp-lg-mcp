@@ -64,7 +64,10 @@ async def route_lookup(destination: str, server: str = "RouteViews Linx", format
         return _error_response(f"Error: {message}", format)
 
     try:
-        command = f"show ip bgp {destination}"
+        if get_ip_type(destination) == "IPv6":
+            command = f"show bgp ipv6 unicast {destination}"
+        else:
+            command = f"show ip bgp {destination}"
         response = await execute_bgp_command(server, command)
         
         # Return JSON format if requested
