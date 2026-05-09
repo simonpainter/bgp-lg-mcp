@@ -517,6 +517,15 @@ Edit `config.json` to modify route servers or add new ones:
 - **timeout** - Connection timeout in seconds
 - **enabled** - Enable/disable without removing from config
 
+### Outbound rate limiting
+
+To protect public infrastructure from connection floods, outbound requests are throttled:
+
+- Per-server telnet limit: `BGP_PER_SERVER_MAX_CONNECTIONS` (default: `2`)
+- Global outbound limit across telnet + BGPKit API calls: `BGP_GLOBAL_MAX_OUTBOUND` (default: `10`)
+
+When limits are reached, new requests wait for an available slot.
+
 ## Running the Server
 
 ### MCP Stdio Mode (Recommended for Claude Desktop)
@@ -668,7 +677,7 @@ route_lookup(destination="1.1.1.1", server="Equinix Ashburn")
 - **Telnet only** - Currently only supports telnet connections (RFC 854 compatible)
 - **Public IPs only** - Private/reserved address ranges are blocked
 - **No authentication required** - All configured servers are public and free
-- **Query rate limited** - No specific rate limiting, but be respectful of public resources
+- **Outbound request throttling** - Per-server and global concurrency limits are enforced
 
 ## Contributing
 
