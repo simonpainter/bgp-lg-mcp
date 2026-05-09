@@ -22,4 +22,7 @@ def test_list_servers_has_single_mcp_tool_decorator():
         and decorator.func.attr == "tool"
     ]
 
-    assert len(mcp_tool_decorators) == 1
+    assert len(mcp_tool_decorators) == 1, (
+        f"Expected exactly 1 @mcp.tool() decorator on list_servers, "
+        f"but found {len(mcp_tool_decorators)}"
+    )
