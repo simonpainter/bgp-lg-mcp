@@ -35,6 +35,11 @@ from models import (
 )
 
 
+def _error_response(message: str, fmt: str) -> str:
+    """Return a formatted error response in text or JSON."""
+    error = ErrorResponse(error=message)
+    return error.model_dump_json(indent=2) if fmt.lower() == "json" else message
+
 
 # Create the MCP server
 mcp = FastMCP("BGP Looking Glass")
@@ -56,10 +61,7 @@ async def route_lookup(destination: str, server: str = "RouteViews Linx", format
     # Validate destination
     is_valid, message = validate_ip_or_cidr(destination)
     if not is_valid:
-        error = ErrorResponse(error=message)
-        if format.lower() == "json":
-            return error.model_dump_json(indent=2)
-        return f"Error: {message}"
+        return _error_response(f"Error: {message}", format)
 
     try:
         command = f"show ip bgp {destination}"
@@ -72,26 +74,16 @@ async def route_lookup(destination: str, server: str = "RouteViews Linx", format
         
         return response
     except ValueError as e:
-        error = ErrorResponse(error=f"Configuration error: {str(e)}")
-        if format.lower() == "json":
-            return error.model_dump_json(indent=2)
-        return f"Configuration error: {str(e)}"
+        return _error_response(f"Configuration error: {str(e)}", format)
     except ConnectionError as e:
-        error_msg = f"Connection error: {str(e)} - The BGP server may be unreachable or not accepting connections"
-        error = ErrorResponse(error=error_msg)
-        if format.lower() == "json":
-            return error.model_dump_json(indent=2)
-        return error_msg
+        return _error_response(
+            f"Connection error: {str(e)} - The BGP server may be unreachable or not accepting connections",
+            format,
+        )
     except RuntimeError as e:
-        error = ErrorResponse(error=f"Query error: {str(e)}")
-        if format.lower() == "json":
-            return error.model_dump_json(indent=2)
-        return f"Query error: {str(e)}"
+        return _error_response(f"Query error: {str(e)}", format)
     except Exception as e:
-        error = ErrorResponse(error=f"Unexpected error: {type(e).__name__}: {str(e)}")
-        if format.lower() == "json":
-            return error.model_dump_json(indent=2)
-        return f"Unexpected error: {type(e).__name__}: {str(e)}"
+        return _error_response(f"Unexpected error: {type(e).__name__}: {str(e)}", format)
 
 
 @mcp.tool()
@@ -124,26 +116,16 @@ async def bgp_summary(server: str = "RouteViews Linx", format: str = "text") -> 
         
         return response        
     except ValueError as e:
-        error = ErrorResponse(error=f"Configuration error: {str(e)}")
-        if format.lower() == "json":
-            return error.model_dump_json(indent=2)
-        return f"Configuration error: {str(e)}"
+        return _error_response(f"Configuration error: {str(e)}", format)
     except ConnectionError as e:
-        error_msg = f"Connection error: {str(e)} - The BGP server may be unreachable or not accepting connections"
-        error = ErrorResponse(error=error_msg)
-        if format.lower() == "json":
-            return error.model_dump_json(indent=2)
-        return error_msg
+        return _error_response(
+            f"Connection error: {str(e)} - The BGP server may be unreachable or not accepting connections",
+            format,
+        )
     except RuntimeError as e:
-        error = ErrorResponse(error=f"Query error: {str(e)}")
-        if format.lower() == "json":
-            return error.model_dump_json(indent=2)
-        return f"Query error: {str(e)}"
+        return _error_response(f"Query error: {str(e)}", format)
     except Exception as e:
-        error = ErrorResponse(error=f"Unexpected error: {type(e).__name__}: {str(e)}")
-        if format.lower() == "json":
-            return error.model_dump_json(indent=2)
-        return f"Unexpected error: {type(e).__name__}: {str(e)}"
+        return _error_response(f"Unexpected error: {type(e).__name__}: {str(e)}", format)
 
 
 @mcp.tool()
@@ -198,10 +180,7 @@ def list_servers(format: str = "text") -> str:
         
         return output
     except Exception as e:
-        error = ErrorResponse(error=f"Error listing servers: {str(e)}")
-        if format.lower() == "json":
-            return error.model_dump_json(indent=2)
-        return f"Error listing servers: {str(e)}"
+        return _error_response(f"Error listing servers: {str(e)}", format)
 
 
 @mcp.tool()
@@ -226,20 +205,11 @@ async def asn_owner(asn: str, format: str = "text") -> str:
         
         return f"ASN {asn}: {owner_name}"
     except ValueError as e:
-        error = ErrorResponse(error=f"Invalid ASN: {str(e)}")
-        if format.lower() == "json":
-            return error.model_dump_json(indent=2)
-        return f"Invalid ASN: {str(e)}"
+        return _error_response(f"Invalid ASN: {str(e)}", format)
     except RuntimeError as e:
-        error = ErrorResponse(error=f"Lookup error: {str(e)}")
-        if format.lower() == "json":
-            return error.model_dump_json(indent=2)
-        return f"Lookup error: {str(e)}"
+        return _error_response(f"Lookup error: {str(e)}", format)
     except Exception as e:
-        error = ErrorResponse(error=f"Unexpected error: {type(e).__name__}: {str(e)}")
-        if format.lower() == "json":
-            return error.model_dump_json(indent=2)
-        return f"Unexpected error: {type(e).__name__}: {str(e)}"
+        return _error_response(f"Unexpected error: {type(e).__name__}: {str(e)}", format)
 
 
 @mcp.tool()
@@ -275,20 +245,11 @@ async def ip_lookup(ip: str, format: str = "text") -> str:
         
         return output
     except ValueError as e:
-        error = ErrorResponse(error=f"Invalid IP address: {str(e)}")
-        if format.lower() == "json":
-            return error.model_dump_json(indent=2)
-        return f"Invalid IP address: {str(e)}"
+        return _error_response(f"Invalid IP address: {str(e)}", format)
     except RuntimeError as e:
-        error = ErrorResponse(error=f"Lookup error: {str(e)}")
-        if format.lower() == "json":
-            return error.model_dump_json(indent=2)
-        return f"Lookup error: {str(e)}"
+        return _error_response(f"Lookup error: {str(e)}", format)
     except Exception as e:
-        error = ErrorResponse(error=f"Unexpected error: {type(e).__name__}: {str(e)}")
-        if format.lower() == "json":
-            return error.model_dump_json(indent=2)
-        return f"Unexpected error: {type(e).__name__}: {str(e)}"
+        return _error_response(f"Unexpected error: {type(e).__name__}: {str(e)}", format)
 
 
 @mcp.tool()
@@ -307,10 +268,7 @@ async def ping_host(ip: str, server: str = "RouteViews Linx", format: str = "tex
     # Validate IP
     is_valid, message = validate_ip_or_cidr(ip)
     if not is_valid:
-        error = ErrorResponse(error=message)
-        if format.lower() == "json":
-            return error.model_dump_json(indent=2)
-        return f"Error: {message}"
+        return _error_response(f"Error: {message}", format)
 
     try:
         # Get server config to check if server exists and supports ping
@@ -358,26 +316,16 @@ async def ping_host(ip: str, server: str = "RouteViews Linx", format: str = "tex
         
         return output
     except ValueError as e:
-        error = ErrorResponse(error=str(e))
-        if format.lower() == "json":
-            return error.model_dump_json(indent=2)
-        return f"Error: {str(e)}"
+        return _error_response(f"Error: {str(e)}", format)
     except ConnectionError as e:
-        error_msg = f"Connection error: {str(e)} - The BGP server may be unreachable or not accepting connections"
-        error = ErrorResponse(error=error_msg)
-        if format.lower() == "json":
-            return error.model_dump_json(indent=2)
-        return error_msg
+        return _error_response(
+            f"Connection error: {str(e)} - The BGP server may be unreachable or not accepting connections",
+            format,
+        )
     except RuntimeError as e:
-        error = ErrorResponse(error=f"Ping error: {str(e)}")
-        if format.lower() == "json":
-            return error.model_dump_json(indent=2)
-        return f"Ping error: {str(e)}"
+        return _error_response(f"Ping error: {str(e)}", format)
     except Exception as e:
-        error = ErrorResponse(error=f"Unexpected error: {type(e).__name__}: {str(e)}")
-        if format.lower() == "json":
-            return error.model_dump_json(indent=2)
-        return f"Unexpected error: {type(e).__name__}: {str(e)}"
+        return _error_response(f"Unexpected error: {type(e).__name__}: {str(e)}", format)
 
 
 @mcp.tool()
@@ -396,10 +344,7 @@ async def traceroute_host(ip: str, server: str = "RouteViews Linx", format: str 
     # Validate IP
     is_valid, message = validate_ip_or_cidr(ip)
     if not is_valid:
-        error = ErrorResponse(error=message)
-        if format.lower() == "json":
-            return error.model_dump_json(indent=2)
-        return f"Error: {message}"
+        return _error_response(f"Error: {message}", format)
 
     try:
         # Get server config to check if server exists and supports traceroute
@@ -466,26 +411,16 @@ async def traceroute_host(ip: str, server: str = "RouteViews Linx", format: str 
         
         return output
     except ValueError as e:
-        error = ErrorResponse(error=str(e))
-        if format.lower() == "json":
-            return error.model_dump_json(indent=2)
-        return f"Error: {str(e)}"
+        return _error_response(f"Error: {str(e)}", format)
     except ConnectionError as e:
-        error_msg = f"Connection error: {str(e)} - The BGP server may be unreachable or not accepting connections"
-        error = ErrorResponse(error=error_msg)
-        if format.lower() == "json":
-            return error.model_dump_json(indent=2)
-        return error_msg
+        return _error_response(
+            f"Connection error: {str(e)} - The BGP server may be unreachable or not accepting connections",
+            format,
+        )
     except RuntimeError as e:
-        error = ErrorResponse(error=f"Traceroute error: {str(e)}")
-        if format.lower() == "json":
-            return error.model_dump_json(indent=2)
-        return f"Traceroute error: {str(e)}"
+        return _error_response(f"Traceroute error: {str(e)}", format)
     except Exception as e:
-        error = ErrorResponse(error=f"Unexpected error: {type(e).__name__}: {str(e)}")
-        if format.lower() == "json":
-            return error.model_dump_json(indent=2)
-        return f"Unexpected error: {type(e).__name__}: {str(e)}"
+        return _error_response(f"Unexpected error: {type(e).__name__}: {str(e)}", format)
 
 
 # Create ASGI application for production deployment
