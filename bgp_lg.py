@@ -124,13 +124,11 @@ async def _http_request_with_retry(
 class TelnetClient:
     """Async telnet client for BGP looking-glass servers."""
 
-    _AUTH_FAILURE_KEYWORDS = (
-        "login incorrect",
-        "authentication failed",
-        "access denied",
-        "invalid password",
-        "invalid credentials",
-        "permission denied",
+    _INITIAL_BANNER_WAIT = 15
+    _AUTH_FAILURE_PATTERN = re.compile(
+        r"(^|\n)\s*(login incorrect|authentication failed|access denied|"
+        r"invalid password|invalid credentials|permission denied)\b",
+        re.IGNORECASE,
     )
 
     def __init__(
@@ -237,7 +235,10 @@ class TelnetClient:
             )
 
             # Read initial banner/prompt
-            banner = await self._read_until_prompt(max_wait=15, require_prompt=False)
+            banner = await self._read_until_prompt(
+                max_wait=self._INITIAL_BANNER_WAIT,
+                require_prompt=False,
+            )
 
             # Authenticate if credentials provided
             if self.username:
@@ -257,8 +258,7 @@ class TelnetClient:
 
     def _raise_on_auth_failure(self, response: str) -> None:
         """Raise if the server response indicates authentication failure."""
-        response_lower = response.lower()
-        if any(keyword in response_lower for keyword in self._AUTH_FAILURE_KEYWORDS):
+        if self._AUTH_FAILURE_PATTERN.search(response):
             raise ConnectionError(f"Authentication failed: {response}")
 
     async def _send_command(self, command: str) -> None:

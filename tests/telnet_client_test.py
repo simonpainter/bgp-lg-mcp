@@ -38,7 +38,7 @@ async def test_telnet_client_connect_raises_on_authentication_failure(
         nonlocal read_calls
         read_calls += 1
         if read_calls == 1:
-            assert max_wait == 15
+            assert max_wait == client._INITIAL_BANNER_WAIT
             assert require_prompt is False
         else:
             assert max_wait == client.timeout
