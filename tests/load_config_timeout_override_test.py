@@ -3,7 +3,7 @@ import json
 import bgp_lg
 
 
-def test_load_config_env_timeout_override_does_not_pollute_server_dict(monkeypatch, tmp_path):
+def test_env_timeout_override_no_sentinel_pollution(monkeypatch, tmp_path):
     config_path = tmp_path / "config.json"
     config_path.write_text(
         json.dumps(

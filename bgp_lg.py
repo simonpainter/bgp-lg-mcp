@@ -410,7 +410,7 @@ def get_ip_type(destination: str) -> str:
 # Global config
 _config: Optional[dict] = None
 _config_path: Optional[Path] = None
-_env_timeout_override_servers: set[int] = set()
+_env_timeout_override_servers: set[str] = set()
 
 
 def _get_config_path() -> Path:
@@ -454,11 +454,11 @@ def load_config() -> dict:
         if timeout_override:
             try:
                 timeout = int(timeout_override)
-                for server in _config.get("servers", []):
-                    server_id = id(server)
-                    if "timeout" not in server or server_id in _env_timeout_override_servers:
+                for idx, server in enumerate(_config.get("servers", [])):
+                    server_key = str(server.get("name", f"__index_{idx}"))
+                    if "timeout" not in server or server_key in _env_timeout_override_servers:
                         server["timeout"] = timeout
-                        _env_timeout_override_servers.add(server_id)
+                        _env_timeout_override_servers.add(server_key)
             except ValueError:
                 pass
         
