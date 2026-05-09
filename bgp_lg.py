@@ -126,7 +126,7 @@ class TelnetClient:
 
     _INITIAL_BANNER_WAIT = 15
     _AUTH_FAILURE_PATTERN = re.compile(
-        r"(^|\n)\s*(login incorrect|authentication failed|access denied|"
+        r"\b(login incorrect|authentication failed|access denied|"
         r"invalid password|invalid credentials|permission denied)\b",
         re.IGNORECASE,
     )
@@ -258,8 +258,8 @@ class TelnetClient:
 
     def _raise_on_auth_failure(self, response: str) -> None:
         """Raise if the server response indicates authentication failure."""
-        if self._AUTH_FAILURE_PATTERN.search(response):
-            raise ConnectionError(f"Authentication failed: {response}")
+        if match := self._AUTH_FAILURE_PATTERN.search(response):
+            raise ConnectionError(f"Authentication failed: {match.group(1)}")
 
     async def _send_command(self, command: str) -> None:
         """Send a command to the server."""
