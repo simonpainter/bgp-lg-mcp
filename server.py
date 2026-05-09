@@ -253,12 +253,12 @@ async def ip_lookup(ip: str, format: str = "text") -> str:
 
 
 @mcp.tool()
-async def ping_host(ip: str, server: str = "RouteViews Linx", format: str = "text") -> str:
+async def ping_host(ip: str, server: str = "RouteViews Main", format: str = "text") -> str:
     """Ping an IP address from a BGP looking-glass server.
 
     Args:
         ip: IPv4 or IPv6 address to ping.
-        server: Name of the BGP server to use for pinging (defaults to RouteViews Linx).
+        server: Name of the BGP server to use for pinging (defaults to RouteViews Main).
                 Call list_servers() to see all available servers.
         format: Response format - "text" (default) or "json" for structured output.
 
@@ -329,12 +329,12 @@ async def ping_host(ip: str, server: str = "RouteViews Linx", format: str = "tex
 
 
 @mcp.tool()
-async def traceroute_host(ip: str, server: str = "RouteViews Linx", format: str = "text") -> str:
+async def traceroute_host(ip: str, server: str = "RouteViews Main", format: str = "text") -> str:
     """Trace the route to an IP address from a BGP looking-glass server.
 
     Args:
         ip: IPv4 or IPv6 address to trace route to.
-        server: Name of the BGP server to use for traceroute (defaults to RouteViews Linx).
+        server: Name of the BGP server to use for traceroute (defaults to RouteViews Main).
                 Call list_servers() to see all available servers.
         format: Response format - "text" (default) or "json" for structured output.
 
