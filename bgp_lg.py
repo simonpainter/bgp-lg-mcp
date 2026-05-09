@@ -641,16 +641,13 @@ def _parse_bgp_route_lookup(output: str) -> RouteLookupResponse:
     # Simple parsing of common BGP output format
     for line in lines:
         line = line.strip()
-        if not line or line.startswith('*'):
+        if not line:
             continue
         
-        # Look for BGP route lines (typically start with ">", "i", or similar)
-        if re.match(r'^[>i*+\-#]?\s*\d+\.\d+\.\d+\.\d+', line):
-            # Extract prefix if present
-            parts = line.split()
-            if parts:
-                prefix = parts[0] if not parts[0] in ['>', 'i', '*', '+', '-', '#'] else (parts[1] if len(parts) > 1 else None)
-                routes.append(BGPRoute(prefix=prefix))
+        # Look for BGP route lines (allowing status markers like *, >, i, etc.)
+        route_match = re.match(r'^[>i*+\-#\s]*(\d+\.\d+\.\d+\.\d+(?:/\d{1,2})?)\b', line)
+        if route_match:
+            routes.append(BGPRoute(prefix=route_match.group(1)))
     
     parse_status = "success" if routes else "no_routes_found"
     
@@ -920,4 +917,3 @@ def _parse_traceroute_output(output: str, target_ip: str) -> dict:
     result["total_hops"] = len(result["hops"])
     
     return result
-
