@@ -124,6 +124,8 @@ async def _http_request_with_retry(
 class TelnetClient:
     """Async telnet client for BGP looking-glass servers."""
 
+    _AUTH_FAILURE_KEYWORDS = ("login incorrect", "authentication failed")
+
     def __init__(
         self,
         host: str,
@@ -234,15 +236,23 @@ class TelnetClient:
             if self.username:
                 await self._send_command(self.username)
                 response = await self._read_until_prompt(max_wait=self.timeout)
+                self._raise_on_auth_failure(response)
 
             if self.password:
                 await self._send_command(self.password)
                 response = await self._read_until_prompt(max_wait=self.timeout)
+                self._raise_on_auth_failure(response)
 
         except asyncio.TimeoutError:
             raise ConnectionError(f"Timeout connecting to {self.host}:{self.port}")
         except Exception as e:
             raise ConnectionError(f"Failed to connect to {self.host}: {str(e)}")
+
+    def _raise_on_auth_failure(self, response: str) -> None:
+        """Raise if the server response indicates authentication failure."""
+        lowered = response.lower()
+        if any(keyword in lowered for keyword in self._AUTH_FAILURE_KEYWORDS):
+            raise ConnectionError(f"Authentication failed: {response}")
 
     async def _send_command(self, command: str) -> None:
         """Send a command to the server."""
