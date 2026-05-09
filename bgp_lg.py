@@ -496,21 +496,6 @@ def get_available_servers() -> list:
     ]
 
 
-def build_server_description() -> str:
-    """Build a formatted description of available servers for tool docs.
-
-    Returns:
-        Formatted string describing available servers.
-    """
-    servers = get_available_servers()
-    if not servers:
-        return "No servers available."
-    
-    desc = "Available servers: " + ", ".join(servers)
-    desc += f". Default: '{servers[0]}' (fastest)."
-    return desc
-
-
 async def execute_bgp_command(server_name: str, command: str) -> str:
     """Execute a command on a BGP looking-glass server.
 
@@ -935,5 +920,4 @@ def _parse_traceroute_output(output: str, target_ip: str) -> dict:
     result["total_hops"] = len(result["hops"])
     
     return result
-
 
