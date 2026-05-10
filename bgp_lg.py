@@ -756,7 +756,7 @@ def _parse_bgp_summary(output: str) -> BGPSummaryResponse:
                             pass
 
         summary_match = re.search(
-            r'(\d+)\s+BGP\s+(?:neighbors|peers),\s*(\d+)\s+up,\s*(\d+)\s+established',
+            r'(\d+)\s+BGP\s+(?:neighbors(?:/peers)?|peers),\s*(\d+)\s+up,\s*(\d+)\s+established',
             stripped_line,
             re.IGNORECASE,
         )
