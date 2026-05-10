@@ -22,6 +22,6 @@ def test_bgp_summary_neighbors_are_validated_as_models():
     assert parsed.neighbors[0].peer_ip == "192.0.2.1"
 
 
-def test_bgp_summary_neighbors_reject_invalid_peer_ip_shape():
-    with pytest.raises(ValueError):
+def test_bgp_summary_neighbors_reject_invalid_neighbor_type():
+    with pytest.raises(ValueError, match="neighbors.0"):
         BGPSummaryResponse(raw_output="sample", neighbors=["not-a-neighbor-object"])
