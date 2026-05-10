@@ -1,4 +1,5 @@
 import json
+import re
 
 import bgp_lg
 import pytest
@@ -41,7 +42,10 @@ def test_load_config_missing_file_has_helpful_error(monkeypatch, tmp_path):
     monkeypatch.setattr(bgp_lg, "_config", None)
     monkeypatch.setattr(bgp_lg, "_config_path", None)
 
-    with pytest.raises(FileNotFoundError, match=f"Config file not found at {missing_path}"):
+    with pytest.raises(
+        FileNotFoundError,
+        match=re.escape(f"Config file not found at {missing_path}"),
+    ):
         bgp_lg.load_config()
 
 
@@ -53,5 +57,8 @@ def test_load_config_invalid_json_has_helpful_error(monkeypatch, tmp_path):
     monkeypatch.setattr(bgp_lg, "_config", None)
     monkeypatch.setattr(bgp_lg, "_config_path", None)
 
-    with pytest.raises(ValueError, match=f"Invalid JSON in config file {config_path}:"):
+    with pytest.raises(
+        ValueError,
+        match=re.escape(f"Invalid JSON in config file {config_path}:"),
+    ):
         bgp_lg.load_config()
