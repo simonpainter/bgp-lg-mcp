@@ -371,13 +371,10 @@ class TelnetClient:
         """
         if not self.writer:
             raise ConnectionError("Not connected")
-        
-        try:
-            await self._send_command(command)
-            response = await self._read_until_prompt(max_wait=self.timeout)
-            return response
-        except Exception as e:
-            raise
+
+        await self._send_command(command)
+        response = await self._read_until_prompt(max_wait=self.timeout)
+        return response
 
     async def close(self) -> None:
         """Close the connection."""
