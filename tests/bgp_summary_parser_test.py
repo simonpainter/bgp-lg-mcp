@@ -48,3 +48,13 @@ Neighbor        V    AS MsgRcvd MsgSent TblVer InQ OutQ Up/Down State/PfxRcd
     assert parsed.parse_status == "success"
     assert parsed.neighbor_count == 4
     assert parsed.established_count == 2
+
+
+def test_parse_bgp_summary_strips_trailing_punctuation_from_router_id():
+    output = """BGP router identifier 1.1.1.1, local AS number 64512
+Router ID: 2.2.2.2:
+"""
+
+    parsed = bgp_lg._parse_bgp_summary(output)
+
+    assert parsed.router_id == "2.2.2.2"

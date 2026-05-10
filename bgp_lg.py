@@ -742,7 +742,7 @@ def _parse_bgp_summary(output: str) -> BGPSummaryResponse:
             for i, part in enumerate(parts):
                 if part in ['ID:', 'identifier']:
                     if i + 1 < len(parts):
-                        router_id = parts[i + 1]
+                        router_id = parts[i + 1].rstrip(',:')
         
         # Look for local AS
         if 'local AS number' in stripped_line or 'Local AS Number' in stripped_line:
