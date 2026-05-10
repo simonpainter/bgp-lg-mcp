@@ -509,10 +509,10 @@ def load_config() -> dict:
                 pass
         
         return _config
-    except FileNotFoundError:
-        raise
+    except FileNotFoundError as e:
+        raise FileNotFoundError(f"Config file not found at {config_path}") from e
     except json.JSONDecodeError as e:
-        raise
+        raise ValueError(f"Invalid JSON in config file {config_path}: {e}") from e
 
 
 def get_server_config(server_name: str) -> Optional[dict]:
