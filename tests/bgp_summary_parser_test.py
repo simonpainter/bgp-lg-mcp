@@ -24,10 +24,11 @@ Neighbor        V    AS MsgRcvd MsgSent TblVer InQ OutQ Up/Down State/PfxRcd
 192.0.2.1       4 64496    100    200      0   0   0 1d02h        10
 198.51.100.1    4 64497    300    400      0   0   0 00:10:00     Active
 2001:db8::1     4 64498    500    600      0   0   0 2d01h        25
+2001:db8::2     4 64499    700    800      0   0   0 00:00:10     Connect
 """
 
     parsed = bgp_lg._parse_bgp_summary(output)
 
     assert parsed.parse_status == "success"
-    assert parsed.neighbor_count == 3
+    assert parsed.neighbor_count == 4
     assert parsed.established_count == 2

@@ -780,16 +780,14 @@ def _parse_bgp_summary(output: str) -> BGPSummaryResponse:
                 continue
 
             first_token = stripped_line.split()[0].strip('*')
-            if not re.fullmatch(r'[0-9A-Fa-f:.]+', first_token):
-                continue
-
             try:
                 ipaddress.ip_address(first_token)
             except ValueError:
                 continue
 
             table_neighbor_count += 1
-            if re.fullmatch(r'\d+', stripped_line.split()[-1]):
+            state_or_prefix = stripped_line.split()[-1]
+            if re.fullmatch(r'\d+', state_or_prefix):
                 table_established_count += 1
 
     if summary_neighbor_count is not None:
