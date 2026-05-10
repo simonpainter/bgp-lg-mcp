@@ -371,13 +371,10 @@ class TelnetClient:
         """
         if not self.writer:
             raise ConnectionError("Not connected")
-        
-        try:
-            await self._send_command(command)
-            response = await self._read_until_prompt(max_wait=self.timeout)
-            return response
-        except Exception as e:
-            raise
+
+        await self._send_command(command)
+        response = await self._read_until_prompt(max_wait=self.timeout)
+        return response
 
     async def close(self) -> None:
         """Close the connection."""
@@ -509,10 +506,10 @@ def load_config() -> dict:
                 pass
         
         return _config
-    except FileNotFoundError:
-        raise
+    except FileNotFoundError as e:
+        raise FileNotFoundError(f"Config file not found at {config_path}") from e
     except json.JSONDecodeError as e:
-        raise
+        raise ValueError(f"Invalid JSON in config file {config_path}: {e}") from e
 
 
 def get_server_config(server_name: str) -> Optional[dict]:
@@ -726,25 +723,30 @@ def _parse_bgp_summary(output: str) -> BGPSummaryResponse:
     local_as: Optional[int] = None
     neighbor_count = 0
     established_count = 0
+    summary_neighbor_count: Optional[int] = None
+    summary_established_count: Optional[int] = None
+    table_neighbor_count = 0
+    table_established_count = 0
+    in_neighbor_table = False
     neighbors: list[BGPNeighbor] = []
     
     lines = output.split('\n')
     
     # Parse BGP router info
     for line in lines:
-        line = line.strip()
+        stripped_line = line.strip()
         
         # Look for Router ID line
-        if 'Router ID:' in line or 'BGP router identifier' in line:
-            parts = line.split()
+        if 'Router ID:' in stripped_line or 'BGP router identifier' in stripped_line:
+            parts = stripped_line.split()
             for i, part in enumerate(parts):
                 if part in ['ID:', 'identifier']:
                     if i + 1 < len(parts):
                         router_id = parts[i + 1]
         
         # Look for local AS
-        if 'local AS number' in line or 'Local AS Number' in line:
-            parts = line.split()
+        if 'local AS number' in stripped_line or 'Local AS Number' in stripped_line:
+            parts = stripped_line.split()
             for i, part in enumerate(parts):
                 if part == 'AS' or 'AS' in part:
                     if i + 1 < len(parts):
@@ -752,13 +754,52 @@ def _parse_bgp_summary(output: str) -> BGPSummaryResponse:
                             local_as = int(parts[i + 1])
                         except ValueError:
                             pass
-        
-        # Look for neighbor count indicators
-        if 'neighbor' in line.lower() or 'peer' in line.lower():
-            # Try to extract numbers from lines mentioning neighbors
-            numbers = re.findall(r'\d+', line)
-            if numbers:
-                neighbor_count = max(neighbor_count, int(numbers[-1]))
+
+        summary_match = re.search(
+            r'(\d+)\s+BGP\s+(?:neighbors|peers),\s*(\d+)\s+up,\s*(\d+)\s+established',
+            stripped_line,
+            re.IGNORECASE,
+        )
+        if summary_match:
+            summary_neighbor_count = int(summary_match.group(1))
+            summary_established_count = int(summary_match.group(3))
+
+        if (
+            'State/PfxRcd' in stripped_line
+            and re.search(r'^\s*Neighbor\b', stripped_line, re.IGNORECASE)
+            and re.search(r'\bAS\b', stripped_line)
+        ):
+            in_neighbor_table = True
+            continue
+
+        if in_neighbor_table:
+            if not stripped_line:
+                continue
+
+            columns = stripped_line.split()
+            if len(columns) < 2:
+                continue
+
+            first_token = columns[0].lstrip('*')
+            try:
+                ipaddress.ip_address(first_token)
+            except ValueError:
+                continue
+
+            table_neighbor_count += 1
+            state_or_prefix = columns[-1]
+            if re.fullmatch(r'\d+', state_or_prefix):
+                table_established_count += 1
+
+    if summary_neighbor_count is not None:
+        neighbor_count = summary_neighbor_count
+    else:
+        neighbor_count = table_neighbor_count
+
+    if summary_established_count is not None:
+        established_count = summary_established_count
+    else:
+        established_count = table_established_count
     
     parse_status = "success" if router_id else "partial"
     
