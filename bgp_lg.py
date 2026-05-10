@@ -779,14 +779,18 @@ def _parse_bgp_summary(output: str) -> BGPSummaryResponse:
             if not stripped_line:
                 continue
 
-            first_token = stripped_line.split()[0].strip('*')
+            columns = stripped_line.split()
+            if len(columns) < 2:
+                continue
+
+            first_token = columns[0].lstrip('*')
             try:
                 ipaddress.ip_address(first_token)
             except ValueError:
                 continue
 
             table_neighbor_count += 1
-            state_or_prefix = stripped_line.split()[-1]
+            state_or_prefix = columns[-1]
             if re.fullmatch(r'\d+', state_or_prefix):
                 table_established_count += 1
 
