@@ -10,7 +10,7 @@ from typing import Optional
 
 import httpx
 
-from models import RouteLookupResponse, BGPSummaryResponse, BGPRoute
+from models import RouteLookupResponse, BGPSummaryResponse, BGPRoute, BGPNeighbor
 
 # Telnet protocol constants
 TELNET_IAC = 0xff  # Interpret As Command
@@ -726,7 +726,7 @@ def _parse_bgp_summary(output: str) -> BGPSummaryResponse:
     local_as: Optional[int] = None
     neighbor_count = 0
     established_count = 0
-    neighbors: list[dict] = []
+    neighbors: list[BGPNeighbor] = []
     
     lines = output.split('\n')
     

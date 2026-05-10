@@ -1,6 +1,6 @@
 """Pydantic models for BGP Looking Glass JSON responses."""
 
-from typing import Optional, List, Any
+from typing import Optional, List
 from pydantic import BaseModel, Field
 
 
@@ -28,6 +28,15 @@ class RouteLookupResponse(BaseModel):
     parse_status: str = "partial"
 
 
+class BGPNeighbor(BaseModel):
+    """Represents a BGP neighbor in summary output."""
+    peer_ip: str
+    asn: Optional[int] = None
+    state: Optional[str] = None
+    uptime: Optional[str] = None
+    prefixes_received: Optional[int] = None
+
+
 class BGPSummaryResponse(BaseModel):
     """Response model for bgp_summary tool."""
     type: str = "bgp_summary"
@@ -36,7 +45,7 @@ class BGPSummaryResponse(BaseModel):
     local_as: Optional[int] = None
     neighbor_count: int = 0
     established_count: int = 0
-    neighbors: List[dict] = Field(default_factory=list)
+    neighbors: List[BGPNeighbor] = Field(default_factory=list)
     parse_status: str = "partial"
 
 
