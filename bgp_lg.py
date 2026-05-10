@@ -745,15 +745,9 @@ def _parse_bgp_summary(output: str) -> BGPSummaryResponse:
                         router_id = parts[i + 1].rstrip(',:')
         
         # Look for local AS
-        if 'local AS number' in stripped_line or 'Local AS Number' in stripped_line:
-            parts = stripped_line.split()
-            for i, part in enumerate(parts):
-                if part == 'AS' or 'AS' in part:
-                    if i + 1 < len(parts):
-                        try:
-                            local_as = int(parts[i + 1])
-                        except ValueError:
-                            pass
+        local_as_match = re.search(r'local\s+AS\s+(?:number\s+)?(\d+)', stripped_line, re.IGNORECASE)
+        if local_as_match:
+            local_as = int(local_as_match.group(1))
 
         summary_match = re.search(
             r'(\d+)\s+BGP\s+(?:neighbors(?:/peers)?|peers),\s*(\d+)\s+up,\s*(\d+)\s+established',

@@ -58,3 +58,14 @@ Router ID: 2.2.2.2:
     parsed = bgp_lg._parse_bgp_summary(output)
 
     assert parsed.router_id == "2.2.2.2"
+
+
+def test_parse_bgp_summary_parses_local_as_from_ios_style_header():
+    output = """BGP router identifier 1.1.1.1, local AS number 64512
+Neighbor        V    AS MsgRcvd MsgSent TblVer InQ OutQ Up/Down State/PfxRcd
+192.0.2.1       4 64496    100    200      0   0   0 1d02h        10
+"""
+
+    parsed = bgp_lg._parse_bgp_summary(output)
+
+    assert parsed.local_as == 64512
