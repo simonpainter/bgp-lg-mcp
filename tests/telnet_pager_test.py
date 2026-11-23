@@ -48,11 +48,27 @@ async def test_pager_continues_and_removes_markers(marker_chunks):
 
 
 @pytest.mark.asyncio
+async def test_multiple_pager_prompts_each_advance_once():
+    client = TelnetClient("example.com", prompt=">")
+    client.reader = FakeReader([
+        b"page one\n --More-- ",
+        b"\x08 \x08page two\n---(more 45%)---",
+        b"page three\nrouter>",
+    ])
+    client.writer = FakeWriter()
+
+    output = await client._read_until_prompt()
+
+    assert client.writer.writes == [b" ", b" "]
+    assert output == "page one\npage two\npage three\nrouter>"
+
+
+@pytest.mark.asyncio
 async def test_connect_disables_paging_after_authentication(monkeypatch):
     credentials = dict(zip(("username", "password"), ("user", "pass")))
     client = TelnetClient("example.com", prompt=">", **credentials)
     reader = FakeReader([
-        b"Username:", b"Password:", b"router>",
+        b"Username:", b"Password: >", b"router>",
         b"terminal length 0\n% Unknown command\nrouter>",
         b"route output\nrouter>",
     ])

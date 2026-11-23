@@ -125,6 +125,8 @@ class TelnetClient:
     """Async telnet client for BGP looking-glass servers."""
 
     _INITIAL_BANNER_WAIT = 15
+    _PAGER_PATTERN = re.compile(rb"---\(more[^)]*\)---| ?--More-- ?")
+    _PAGER_ERASE_PATTERN = re.compile(rb"\x08+ *\x08*")
     _AUTH_FAILURE_PATTERN = re.compile(
         r"\b(login incorrect|authentication failed|access denied|"
         r"invalid password|invalid credentials|permission denied)\b",
@@ -251,6 +253,9 @@ class TelnetClient:
                 response = await self._read_until_prompt(max_wait=self.timeout)
                 self._raise_on_auth_failure(response)
 
+            await self._send_command("terminal length 0")
+            await self._read_until_prompt(max_wait=self.timeout)
+
         except asyncio.TimeoutError:
             raise ConnectionError(f"Timeout connecting to {self.host}:{self.port}")
         except Exception as e:
@@ -310,16 +315,14 @@ class TelnetClient:
                         await self.writer.drain()
                     
                     if cleaned:
-                        output += cleaned
+                        output += self._PAGER_ERASE_PATTERN.sub(b"", cleaned)
 
                     # Check for pager output and handle it
-                    decoded_partial = output.decode(errors="replace")
-                    if "---(more)---" in decoded_partial or "---(" in decoded_partial:
+                    if self._PAGER_PATTERN.search(output):
                         if self.writer:
-                            self.writer.write(b"q")
+                            self.writer.write(b" ")
                             await self.writer.drain()
-                        # Clear the more marker from output
-                        output = output.replace(b"---(more)---", b"")
+                        output = self._PAGER_PATTERN.sub(b"", output)
                         continue
 
                     # Check if prompt is in output
